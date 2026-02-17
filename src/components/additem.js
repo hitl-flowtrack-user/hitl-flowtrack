@@ -19,40 +19,47 @@ const SearchableDropdown = ({ label, options, selected, onSelect, onAdd, onDelet
   const filteredOptions = options.filter(opt => opt.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
-    <div className="flex flex-col gap-1 relative" ref={wrapperRef}>
+    <div className="flex flex-col gap-1 relative" ref={wrapperRef} style={{ marginBottom: '15px' }}>
       <div className="flex items-center justify-between px-1">
-        <label className="text-[12px] text-zinc-400 font-medium">{label} {required && <span className="text-red-500">*</span>}</label>
-        {isSuperAdmin && <span className="text-[10px] text-amber-600/50 uppercase tracking-tighter">Admin Mode</span>}
+        <label style={{ fontSize: '12px', color: '#9ca3af', fontWeight: '500' }}>{label} {required && <span style={{ color: '#ef4444' }}>*</span>}</label>
+        {isSuperAdmin && <span style={{ fontSize: '10px', color: '#d97706', opacity: 0.5, textTransform: 'uppercase' }}>Super Admin Mode</span>}
       </div>
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <div onClick={() => setIsOpen(!isOpen)} className={`bg-[#FFFFFF] rounded-2xl p-3 text-sm text-black cursor-pointer min-h-[45px] flex justify-between items-center shadow-inner transition-all border-2 ${error ? 'border-red-500 ring-2 ring-red-500/20' : 'border-transparent'}`}>
-            <span className={selected ? 'text-black font-bold uppercase' : 'text-zinc-400'}>{selected || `Select ${label}`}</span>
-            <span className={`text-[10px] text-zinc-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}>▼</span>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ position: 'relative', flex: 1 }}>
+          <div onClick={() => setIsOpen(!isOpen)} style={{
+            backgroundColor: '#FFFFFF', borderRadius: '12px', padding: '12px', fontSize: '14px', color: '#000',
+            cursor: 'pointer', minHeight: '45px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            border: error ? '2px solid #ef4444' : '2px solid transparent'
+          }}>
+            <span style={{ fontWeight: selected ? 'bold' : 'normal', textTransform: 'uppercase' }}>{selected || `Select ${label}`}</span>
+            <span style={{ fontSize: '10px', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
           </div>
           {isOpen && (
-            <div className="absolute z-50 w-full mt-2 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-md">
-              <input autoFocus type="text" placeholder="Search..." className="w-full bg-white/5 p-3 text-xs border-b border-white/5 outline-none text-white uppercase" onChange={(e) => setSearchTerm(e.target.value)} />
-              <div className="max-h-48 overflow-y-auto">
+            <div style={{
+              position: 'absolute', zIndex: 50, width: '100%', marginTop: '8px', backgroundColor: '#1a1a1a',
+              border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+            }}>
+              <input autoFocus type="text" placeholder="Search..." style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.05)', padding: '10px', color: '#fff', border: 'none', outline: 'none', textTransform: 'uppercase', fontSize: '12px' }} onChange={(e) => setSearchTerm(e.target.value)} />
+              <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
                 {filteredOptions.map((opt, i) => (
-                  <div key={i} className="flex justify-between items-center group hover:bg-amber-500/10 transition-colors">
-                    <div className="p-3 text-sm text-zinc-300 cursor-pointer flex-1 uppercase" onClick={() => { onSelect(opt.toUpperCase()); setIsOpen(false); }}>{opt}</div>
-                    {isSuperAdmin && <button type="button" onClick={() => onDelete(opt)} className="p-3 text-zinc-600 hover:text-red-500 font-bold">×</button>}
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ padding: '10px', fontSize: '13px', color: '#d1d5db', cursor: 'pointer', flex: 1, textTransform: 'uppercase' }} onClick={() => { onSelect(opt.toUpperCase()); setIsOpen(false); }}>{opt}</div>
+                    {isSuperAdmin && <button type="button" onClick={() => onDelete(opt)} style={{ padding: '10px', color: '#4b5563', fontWeight: 'bold', border: 'none', background: 'none', cursor: 'pointer' }}>×</button>}
                   </div>
                 ))}
               </div>
             </div>
           )}
         </div>
-        <button type="button" onClick={onAdd} className="bg-amber-600/20 text-amber-500 h-[45px] w-[45px] rounded-2xl font-bold hover:bg-amber-500 hover:text-black transition-all">+</button>
+        <button type="button" onClick={onAdd} style={{ backgroundColor: 'rgba(217,119,6,0.2)', color: '#f59e0b', height: '45px', width: '45px', borderRadius: '12px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>+</button>
       </div>
     </div>
   );
 };
 
 const InputField = ({ label, value, onChange, readOnly, type="text", required, errorKey, hasError, clearError, isUppercase }) => (
-  <div className="flex flex-col gap-1">
-    <label className="text-[12px] text-zinc-400 font-medium px-1">{label} {required && <span className="text-red-500">*</span>}</label>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '15px' }}>
+    <label style={{ fontSize: '12px', color: '#9ca3af', fontWeight: '500', paddingLeft: '4px' }}>{label} {required && <span style={{ color: '#ef4444' }}>*</span>}</label>
     <input 
       type={type} value={value} readOnly={readOnly}
       onChange={(e) => {
@@ -60,7 +67,11 @@ const InputField = ({ label, value, onChange, readOnly, type="text", required, e
           const val = isUppercase ? e.target.value.toUpperCase() : e.target.value;
           onChange({ target: { value: val } });
       }}
-      className={`bg-[#FFFFFF] rounded-2xl p-3 text-sm text-black outline-none shadow-inner transition-all border-2 ${isUppercase ? 'uppercase' : ''} ${readOnly ? 'opacity-70 italic border-transparent' : (hasError ? 'border-red-500 ring-2 ring-red-500/20' : 'border-transparent focus:border-amber-500')}`}
+      style={{
+        backgroundColor: '#FFFFFF', borderRadius: '12px', padding: '12px', fontSize: '14px', color: '#000',
+        outline: 'none', border: hasError ? '2px solid #ef4444' : '2px solid transparent',
+        textTransform: isUppercase ? 'uppercase' : 'none', opacity: readOnly ? 0.7 : 1
+      }}
     />
   </div>
 );
@@ -74,8 +85,8 @@ const AddItem = ({ editData, onComplete }) => {
   const [isSuperAdmin] = useState(true);
   const [errors, setErrors] = useState({});
 
-  const [companies, setCompanies] = useState(['FLOWTRACK CO', 'GENERIC']);
-  const [categories, setCategories] = useState(['HARDWARE', 'GENERAL']);
+  const [companies, setCompanies] = useState(['ELITE CO', 'GENERIC']);
+  const [categories, setCategories] = useState(['ELECTRONICS', 'GENERAL']);
   const [subClasses, setSubClasses] = useState(['STANDARD']);
 
   const initialFormState = {
@@ -95,9 +106,9 @@ const AddItem = ({ editData, onComplete }) => {
   }, [editData]);
 
   useEffect(() => {
-    const savedCompanies = JSON.parse(localStorage.getItem('ft_companies')) || ['FLOWTRACK CO', 'GENERIC'];
-    const savedCats = JSON.parse(localStorage.getItem('ft_categories')) || ['HARDWARE', 'GENERAL'];
-    const savedSubs = JSON.parse(localStorage.getItem('ft_subclasses')) || ['STANDARD'];
+    const savedCompanies = JSON.parse(localStorage.getItem('elite_companies')) || ['ELITE CO', 'GENERIC'];
+    const savedCats = JSON.parse(localStorage.getItem('elite_categories')) || ['ELECTRONICS', 'GENERAL'];
+    const savedSubs = JSON.parse(localStorage.getItem('elite_subclasses')) || ['STANDARD'];
     setCompanies(savedCompanies);
     setCategories(savedCats);
     setSubClasses(savedSubs);
@@ -137,10 +148,10 @@ const AddItem = ({ editData, onComplete }) => {
   };
 
   const downloadExcelTemplate = () => {
-    const templateData = [{ Name: "ITEM NAME", Company: "BRAND", Category: "TYPE", SubClass: "STD", Weight: 1, PcsPerBox: 12, PurchasePrice: 100, RetailPrice: 150, MinStock: 5, MaxStock: 50, SpecsEN: "Specs", SpecsUR: "تفصیل" }];
+    const templateData = [{ Name: "ITEM NAME", Company: "ELITE", Category: "ELEC", SubClass: "STD", Weight: 1, PcsPerBox: 12, PurchasePrice: 100, RetailPrice: 150, MinStock: 5, MaxStock: 50, SpecsEN: "Specs", SpecsUR: "تفصیل" }];
     const ws = XLSX.utils.json_to_sheet(templateData);
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "FlowTrack_Template");
-    XLSX.writeFile(wb, "FlowTrack_Import_Template.xlsx");
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Elite_Template");
+    XLSX.writeFile(wb, "Elite_Import_Template.xlsx");
   };
 
   const handleExcelImport = (e) => {
@@ -155,7 +166,7 @@ const AddItem = ({ editData, onComplete }) => {
         data.forEach(item => {
           if (item.Name) {
             const sr = `SR-${Math.floor(1000 + Math.random() * 9000)}`;
-            const ref = doc(collection(db, "inventory"));
+            const ref = doc(collection(db, "inventory_records"));
             batch.set(ref, { ...item, srNo: sr, createdAt: serverTimestamp() });
           }
         });
@@ -208,10 +219,10 @@ const AddItem = ({ editData, onComplete }) => {
     try {
       setStatusMessage('SAVING...');
       if (editData) {
-        await updateDoc(doc(db, "inventory", editData.id), { ...formData, updatedAt: serverTimestamp() });
+        await updateDoc(doc(db, "inventory_records", editData.id), { ...formData, updatedAt: serverTimestamp() });
         setStatusMessage('UPDATED!');
       } else {
-        await addDoc(collection(db, "inventory"), { ...formData, createdAt: serverTimestamp() });
+        await addDoc(collection(db, "inventory_records"), { ...formData, createdAt: serverTimestamp() });
         setStatusMessage('SAVED!');
       }
       setTimeout(() => {
@@ -223,74 +234,84 @@ const AddItem = ({ editData, onComplete }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#000000] flex items-center justify-center p-4 lg:p-8 font-sans">
-      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
-        <div className="bg-[#121212] rounded-[2.5rem] p-8 lg:p-10 shadow-2xl flex flex-col gap-6 w-full border border-white/5">
-          <div className="flex justify-between items-center mb-2">
-            <h2 className="text-3xl font-black text-white italic uppercase">{editData ? "Update Item" : "Add Item"}</h2>
-            <div className="flex gap-2">
-                <button type="button" onClick={downloadExcelTemplate} className="bg-emerald-500/10 text-emerald-500 px-3 py-1.5 rounded-full text-[9px] font-bold border border-emerald-500/20 uppercase tracking-tighter">Template</button>
-                <button type="button" onClick={() => excelInputRef.current.click()} className="bg-[#2a2a2a] text-zinc-300 px-4 py-1.5 rounded-full text-[10px] font-bold border border-white/5 uppercase">Import</button>
+    <div style={{ minHeight: '100vh', backgroundColor: '#000', color: '#fff', padding: '20px', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ width: '100%', maxWidth: '1100px', display: 'flex', flexWrap: 'wrap', gap: '30px' }}>
+        
+        {/* LEFT FORM SECTION */}
+        <div style={{ flex: '1 1 500px', backgroundColor: '#121212', padding: '30px', borderRadius: '30px', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: '900', fontStyle: 'italic', textTransform: 'uppercase' }}>{editData ? "Update Item" : "Add Item"}</h2>
+            <div style={{ display: 'flex', gap: '10px' }}>
+                <button type="button" onClick={downloadExcelTemplate} style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#10b981', padding: '5px 12px', borderRadius: '20px', fontSize: '10px', border: '1px solid rgba(16,185,129,0.2)', cursor: 'pointer' }}>TEMPLATE</button>
+                <button type="button" onClick={() => excelInputRef.current.click()} style={{ backgroundColor: '#2a2a2a', color: '#d1d5db', padding: '5px 12px', borderRadius: '20px', fontSize: '10px', border: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer' }}>IMPORT EXCEL</button>
             </div>
           </div>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-            <div className="grid grid-cols-2 gap-4">
+
+          <form onSubmit={handleSubmit}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                 <InputField label="Serial No" value={formData.srNo} readOnly />
                 <InputField label="SKU" value={formData.sku} readOnly />
             </div>
-            <InputField label="Name" required errorKey="name" hasError={errors.name} clearError={clearError} value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} isUppercase={true} />
-            <SearchableDropdown label="Company" required error={errors.company} options={companies} selected={formData.company} isSuperAdmin={isSuperAdmin} onSelect={(v) => { clearError('company'); setFormData({...formData, company: v}); }} onAdd={() => addNewOption('Company', companies, setCompanies, 'ft_companies')} onDelete={(v) => deleteOption(v, companies, setCompanies, 'ft_companies')} />
-            <SearchableDropdown label="Category" required error={errors.category} options={categories} selected={formData.category} isSuperAdmin={isSuperAdmin} onSelect={(v) => { clearError('category'); setFormData({...formData, category: v}); }} onAdd={() => addNewOption('Category', categories, setCategories, 'ft_categories')} onDelete={(v) => deleteOption(v, categories, setCategories, 'ft_categories')} />
-            <SearchableDropdown label="SubClass" required error={errors.subClass} options={subClasses} selected={formData.subClass} isSuperAdmin={isSuperAdmin} onSelect={(v) => { clearError('subClass'); setFormData({...formData, subClass: v}); }} onAdd={() => addNewOption('Sub-Class', subClasses, setSubClasses, 'ft_subclasses')} onDelete={(v) => deleteOption(v, subClasses, setSubClasses, 'ft_subclasses')} />
-            <div className="grid grid-cols-2 gap-4">
+            
+            <InputField label="Item Name" required errorKey="name" hasError={errors.name} clearError={clearError} value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} isUppercase={true} />
+            
+            <SearchableDropdown label="Company" required error={errors.company} options={companies} selected={formData.company} isSuperAdmin={isSuperAdmin} onSelect={(v) => { clearError('company'); setFormData({...formData, company: v}); }} onAdd={() => addNewOption('Company', companies, setCompanies, 'elite_companies')} onDelete={(v) => deleteOption(v, companies, setCompanies, 'elite_companies')} />
+            
+            <SearchableDropdown label="Category" required error={errors.category} options={categories} selected={formData.category} isSuperAdmin={isSuperAdmin} onSelect={(v) => { clearError('category'); setFormData({...formData, category: v}); }} onAdd={() => addNewOption('Category', categories, setCategories, 'elite_categories')} onDelete={(v) => deleteOption(v, categories, setCategories, 'elite_categories')} />
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                 <InputField label="Weight (KG)" type="number" value={formData.weight} onChange={(e)=>setFormData({...formData, weight: e.target.value})} />
                 <InputField label="Pcs Per Box" required errorKey="pcsPerBox" hasError={errors.pcsPerBox} clearError={clearError} type="number" value={formData.pcsPerBox} onChange={(e)=>setFormData({...formData, pcsPerBox: e.target.value})} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                 <InputField label="Purchase Price" required errorKey="purchasePrice" hasError={errors.purchasePrice} clearError={clearError} type="number" value={formData.purchasePrice} onChange={(e)=>setFormData({...formData, purchasePrice: e.target.value})} />
                 <InputField label="Retail Price" required errorKey="retailPrice" hasError={errors.retailPrice} clearError={clearError} type="number" value={formData.retailPrice} onChange={(e)=>setFormData({...formData, retailPrice: e.target.value})} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-                <InputField label="Min Stock" required errorKey="minStock" hasError={errors.minStock} clearError={clearError} type="number" value={formData.minStock} onChange={(e)=>setFormData({...formData, minStock: e.target.value})} />
-                <InputField label="Max Stock" required errorKey="maxStock" hasError={errors.maxStock} clearError={clearError} type="number" value={formData.maxStock} onChange={(e)=>setFormData({...formData, maxStock: e.target.value})} />
-            </div>
+
             <InputField label="Specs (English)" value={formData.specsEN} onChange={(e)=>setFormData({...formData, specsEN: e.target.value})} />
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] text-zinc-400 font-medium px-1">Specs (Urdu)</label>
-              <textarea dir="rtl" value={formData.specsUR} onChange={(e)=>setFormData({...formData, specsUR: e.target.value})} className="bg-[#FFFFFF] rounded-2xl p-3 text-sm text-black outline-none h-16 font-urdu shadow-inner" />
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '20px' }}>
+              <label style={{ fontSize: '12px', color: '#9ca3af', fontWeight: '500' }}>Specs (Urdu)</label>
+              <textarea dir="rtl" value={formData.specsUR} onChange={(e)=>setFormData({...formData, specsUR: e.target.value})} style={{ backgroundColor: '#FFFFFF', borderRadius: '15px', padding: '12px', fontSize: '14px', color: '#000', border: 'none', height: '60px', outline: 'none' }} />
             </div>
-            <button type="submit" className="mt-2 bg-amber-500 text-black py-4 rounded-2xl font-black uppercase tracking-[0.3em] text-xs hover:bg-amber-400 transition-all shadow-lg active:scale-95 italic">
-              {statusMessage || (editData ? "Confirm Update" : "Save Item")}
+
+            <button type="submit" style={{ width: '100%', padding: '15px', backgroundColor: '#f59e0b', color: '#000', border: 'none', borderRadius: '15px', fontWeight: '900', fontSize: '14px', cursor: 'pointer', letterSpacing: '2px' }}>
+              {statusMessage || (editData ? "CONFIRM UPDATE" : "SAVE ITEM")}
             </button>
-            {editData && <button type="button" onClick={onComplete} className="text-zinc-500 text-[10px] font-bold uppercase underline">Cancel and Go Back</button>}
           </form>
         </div>
-        <div className="flex items-center justify-center lg:sticky lg:top-8 w-full">
-          <div className="bg-[#121212] w-full max-w-[420px] rounded-[3.5rem] p-8 shadow-2xl relative border border-white/5">
-            <div className="absolute top-8 right-8 bg-amber-500 text-black px-4 py-1.5 rounded-full text-[10px] font-black uppercase z-10">PCS: {formData.pcsPerBox || 0}</div>
-            <div onClick={() => fileInputRef.current.click()} className="w-full aspect-square bg-[#1a1a1a] rounded-[2.5rem] mb-8 flex items-center justify-center overflow-hidden border border-white/5 cursor-pointer">
-              {formData.imageUrl ? <img src={formData.imageUrl} className="w-full h-full object-cover" alt="product" /> : <span className="text-zinc-800 font-black text-6xl italic uppercase">IMAGE</span>}
+
+        {/* RIGHT PREVIEW SECTION */}
+        <div style={{ flex: '1 1 350px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div style={{ backgroundColor: '#121212', width: '100%', maxWidth: '380px', padding: '25px', borderRadius: '40px', border: '1px solid rgba(255,255,255,0.05)', position: 'relative' }}>
+            <div style={{ position: 'absolute', top: '25px', right: '25px', backgroundColor: '#f59e0b', color: '#000', padding: '4px 12px', borderRadius: '20px', fontSize: '10px', fontWeight: 'bold' }}>PCS: {formData.pcsPerBox || 0}</div>
+            
+            <div onClick={() => fileInputRef.current.click()} style={{ width: '100%', aspectRatio: '1/1', backgroundColor: '#1a1a1a', borderRadius: '30px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', cursor: 'pointer' }}>
+              {formData.imageUrl ? <img src={formData.imageUrl} style={{ width: '100%', h: '100%', objectFit: 'cover' }} alt="product" /> : <span style={{ color: '#262626', fontWeight: '900', fontSize: '40px', fontStyle: 'italic' }}>IMAGE</span>}
             </div>
-            <div className="space-y-1 mb-8 text-center lg:text-left">
-              <h3 className="text-3xl font-black text-white italic uppercase tracking-tighter truncate">{formData.name || "Item Name"}</h3>
-              <p className="text-amber-500 font-black text-[11px] uppercase tracking-[0.2em]">{formData.company || "Brand ID"}</p>
+
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '22px', fontWeight: '900', textTransform: 'uppercase', color: '#fff', margin: '0' }}>{formData.name || "Product Name"}</h3>
+              <p style={{ color: '#f59e0b', fontSize: '11px', fontWeight: 'bold', letterSpacing: '2px', margin: '5px 0' }}>{formData.company || "COMPANY ID"}</p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div onClick={()=>generateAndDownload('QRCODE')} className="bg-white rounded-[2rem] p-5 flex flex-col items-center justify-center gap-2 cursor-pointer h-36 shadow-lg">
-                <div className="w-14 h-14 border-2 border-black p-1 flex items-center justify-center"><div className="w-7 h-7 bg-black"></div></div>
-                <span className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">QR Print</span>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+              <div onClick={()=>generateAndDownload('QRCODE')} style={{ backgroundColor: '#fff', borderRadius: '20px', padding: '15px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
+                <div style={{ width: '40px', height: '40px', border: '2px solid #000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ width: '20px', height: '20px', backgroundColor: '#000' }}></div></div>
+                <span style={{ fontSize: '9px', color: '#6b7280', fontWeight: '900', marginTop: '10px' }}>QR PRINT</span>
               </div>
-              <div onClick={()=>generateAndDownload('BARCODE')} className="bg-white rounded-[2rem] p-5 flex flex-col items-center justify-center gap-2 cursor-pointer h-36 shadow-lg">
-                <div className="flex gap-[1px] items-center italic text-black font-black text-xl">||||| | ||</div>
-                <span className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Barcode Print</span>
+              <div onClick={()=>generateAndDownload('BARCODE')} style={{ backgroundColor: '#fff', borderRadius: '20px', padding: '15px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
+                <div style={{ fontSize: '18px', color: '#000', fontWeight: 'bold', letterSpacing: '1px' }}>||||| | ||</div>
+                <span style={{ fontSize: '9px', color: '#6b7280', fontWeight: '900', marginTop: '10px' }}>BARCODE PRINT</span>
               </div>
             </div>
           </div>
         </div>
-        <input type="file" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
-        <input type="file" ref={excelInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleExcelImport} />
+
+        <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleImageUpload} />
+        <input type="file" ref={excelInputRef} style={{ display: 'none' }} accept=".xlsx, .xls" onChange={handleExcelImport} />
       </div>
-      <style dangerouslySetInnerHTML={{ __html: `@import url('https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu&display=swap'); .font-urdu { font-family: 'Noto Nastaliq Urdu', serif; }`}} />
     </div>
   );
 };

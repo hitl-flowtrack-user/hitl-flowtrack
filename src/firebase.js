@@ -3,7 +3,7 @@ import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAsS...", // Aapki asli API Key yahan hogi
+  apiKey: "AIzaSy...", // Apni asli API Key yahan paste karein
   authDomain: "elite-vault-93de5.firebaseapp.com",
   projectId: "elite-vault-93de5",
   storageBucket: "elite-vault-93de5.firebasestorage.app",

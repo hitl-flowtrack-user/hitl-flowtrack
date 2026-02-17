@@ -7,15 +7,19 @@ const InventoryView = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 'items' collection se data mangwana (Ya jo bhi aapne Firebase mein rakha hai)
-    const q = query(collection(db, "inventory_data"), orderBy("timestamp", "desc"));
+    // YAHA CHECK KAREIN: "inventory" wahi naam hona chahiye jo additem.js mein hai
+    const q = query(collection(db, "inventory"), orderBy("timestamp", "desc"));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const itemList = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
+      console.log("Fetched Items:", itemList); // Console mein check karne ke liye
       setItems(itemList);
+      setLoading(false);
+    }, (error) => {
+      console.error("Firestore Error:", error);
       setLoading(false);
     });
 
@@ -43,21 +47,24 @@ const InventoryView = () => {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => (
+                {items.length > 0 ? items.map((item) => (
                   <tr key={item.id} style={{ borderBottom: '1px solid #1a1a1a' }}>
-                    <td style={tdStyle}>{item.itemName || 'N/A'}</td>
+                    <td style={tdStyle}>{item.itemName || item.name || 'N/A'}</td>
                     <td style={tdStyle}>{item.category || 'General'}</td>
                     <td style={{ ...tdStyle, color: '#f59e0b', fontWeight: 'bold' }}>{item.quantity || 0}</td>
                     <td style={{ ...tdStyle, fontSize: '10px', color: '#555' }}>
-                      {item.timestamp?.toDate().toLocaleDateString() || 'Recent'}
+                      {item.timestamp?.toDate ? item.timestamp.toDate().toLocaleDateString() : 'Recent'}
                     </td>
                   </tr>
-                ))}
+                )) : (
+                  <tr>
+                    <td colSpan="4" style={{ textAlign: 'center', padding: '40px', color: '#333' }}>
+                      No items found in "inventory" collection.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
-            {items.length === 0 && (
-              <p style={{ textAlign: 'center', marginTop: '30px', color: '#333' }}>No items found in inventory.</p>
-            )}
           </div>
         )}
       </div>

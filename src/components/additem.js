@@ -155,7 +155,7 @@ const AddItem = ({ editData, onComplete }) => {
         data.forEach(item => {
           if (item.Name) {
             const sr = `SR-${Math.floor(1000 + Math.random() * 9000)}`;
-            const ref = doc(collection(db, "elite_inventory"));
+            const ref = doc(collection(db, "inventory"));
             batch.set(ref, { ...item, srNo: sr, createdAt: serverTimestamp() });
           }
         });
@@ -208,10 +208,10 @@ const AddItem = ({ editData, onComplete }) => {
     try {
       setStatusMessage('SAVING...');
       if (editData) {
-        await updateDoc(doc(db, "elite_inventory", editData.id), { ...formData, updatedAt: serverTimestamp() });
+        await updateDoc(doc(db, "inventory", editData.id), { ...formData, updatedAt: serverTimestamp() });
         setStatusMessage('UPDATED!');
       } else {
-        await addDoc(collection(db, "elite_inventory"), { ...formData, createdAt: serverTimestamp() });
+        await addDoc(collection(db, "inventory"), { ...formData, createdAt: serverTimestamp() });
         setStatusMessage('SAVED!');
       }
       setTimeout(() => {

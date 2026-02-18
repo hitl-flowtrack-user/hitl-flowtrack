@@ -25,49 +25,56 @@ const AddItem = ({ editData, onComplete }) => {
 
   const [formData, setFormData] = useState(initialFormState);
 
-  // --- RESPONSIVE CSS STYLES ---
   const styles = `
     .add-item-container { background-color: #000; min-height: 100vh; padding: 20px; font-family: 'Segoe UI', Tahoma, sans-serif; color: #fff; }
     .layout-grid { display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 25px; max-width: 1200px; margin: 0 auto; }
-    
     .form-card { background-color: #111; padding: 30px; border-radius: 30px; border: 1px solid #222; }
     .preview-card { background-color: #111; padding: 25px; border-radius: 30px; border: 1px solid #222; text-align: center; position: sticky; top: 20px; height: fit-content; }
-    
     .input-group { margin-bottom: 20px; width: 100%; }
     .label-text { display: block; color: #9ca3af; font-size: 11px; margin-bottom: 8px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
     .custom-input { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #333; background-color: #fff; color: #000; font-size: 15px; outline: none; box-sizing: border-box; }
     .readonly-input { width: 100%; padding: 14px; border-radius: 12px; border: none; background-color: #1a1a1a; color: #f59e0b; font-size: 15px; font-weight: bold; box-sizing: border-box; }
-    
-    /* Force single column for both mobile and desktop as per request */
     .grid-row-all { display: flex; flex-direction: column; gap: 5px; }
-    
     .btn-main { background-color: #f59e0b; color: #000; width: 100%; padding: 20px; border-radius: 20px; border: none; font-weight: 900; cursor: pointer; margin-top: 25px; text-transform: uppercase; transition: 0.3s; font-size: 16px; }
     .btn-plus { background-color: #f59e0b; color: #000; width: 45px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; margin-left: 8px; }
     .btn-top { background-color: #f59e0b; color: #000; border: none; border-radius: 10px; padding: 10px 20px; font-weight: bold; cursor: pointer; font-size: 12px; }
-
-    @media (max-width: 900px) {
-      .layout-grid { grid-template-columns: 1fr; }
-      .preview-card { position: relative; top: 0; margin-top: 10px; }
-    }
+    @media (max-width: 900px) { .layout-grid { grid-template-columns: 1fr; } .preview-card { position: relative; top: 0; margin-top: 10px; } }
   `;
 
-  useEffect(() => {
-    if (editData) setFormData(editData);
-  }, [editData]);
-
-  // Logic for Auto-capitalization and generating codes
+  // Dynamic Barcode and QR Text Generation
   useEffect(() => {
     if (formData.name && !editData) {
       const nameUpper = formData.name.toUpperCase();
-      const generatedCode = `${nameUpper.substring(0, 3)}-${formData.srNo}`;
+      const volumeStr = `${formData.length}x${formData.width}x${formData.height}`;
+      
+      // Professional Data Strings
+      const newBarcode = `SN:${formData.srNo}|PCS:${formData.pcsPerBox}|WT:${formData.weight}G|VOL:${volumeStr}|PUR:${formData.purchasePrice}`;
+      const newQR = `SKU:${formData.sku}|ITEM:${nameUpper}|CO:${formData.company.toUpperCase()}|CAT:${formData.category.toUpperCase()}|SUB:${formData.subCategory.toUpperCase()}`;
+      
       setFormData(prev => ({ 
         ...prev, 
-        sku: generatedCode, 
-        barcodeData: generatedCode, 
-        qrCodeData: `ITEM:${nameUpper} | CO:${formData.company.toUpperCase()} | PRICE:${formData.retailPrice}`
+        sku: `${nameUpper.substring(0, 3)}-${prev.srNo}`,
+        barcodeData: newBarcode, 
+        qrCodeData: newQR
       }));
     }
-  }, [formData.name, formData.company, formData.retailPrice, formData.srNo, editData]);
+  }, [formData.name, formData.company, formData.pcsPerBox, formData.weight, formData.length, formData.width, formData.height, formData.purchasePrice, editData]);
+
+  const downloadTemplate = () => {
+    const headers = [
+      { 
+        "Item Name": "SAMPLE ITEM", "Company": "ELITE CO", "Category": "ELECTRONICS", 
+        "Sub-Category": "STANDARD", "Pcs Per Box": 12, "Opening Stock": 100, 
+        "Length (Inches)": 10, "Width (Inches)": 5, "Height (Inches)": 8, 
+        "Weight (Grams)": 500, "Purchase Price": 1000, "Trade Price": 1200, 
+        "Retail Price": 1500, "Min Stock": 10, "Max Stock": 500 
+      }
+    ];
+    const ws = XLSX.utils.json_to_sheet(headers);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "InventoryTemplate");
+    XLSX.writeFile(wb, "FlowTrack_Template.xlsx");
+  };
 
   const addOption = (label, list, setter) => {
     const val = prompt(`Add New ${label}:`);
@@ -77,55 +84,40 @@ const AddItem = ({ editData, onComplete }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      setStatusMessage('VERIFYING DATA...');
-      
-      // Duplicate Check Logic
+      setStatusMessage('VERIFYING DUPLICATES...');
       const qName = query(collection(db, "inventory_records"), where("name", "==", formData.name.toUpperCase()));
       const nameSnap = await getDocs(qName);
-      if (!nameSnap.empty) { alert("Error: This Item Name already exists!"); setStatusMessage(''); return; }
+      if (!nameSnap.empty) { alert("Error: Item Name already exists!"); setStatusMessage(''); return; }
 
-      const qBar = query(collection(db, "inventory_records"), where("barcodeData", "==", formData.barcodeData));
-      const barSnap = await getDocs(qBar);
-      if (!barSnap.empty) { alert("Error: This Barcode/SKU already exists!"); setStatusMessage(''); return; }
-
-      setStatusMessage('SAVING TO CLOUD...');
+      setStatusMessage('SAVING...');
       await addDoc(collection(db, "inventory_records"), { 
         ...formData, 
         name: formData.name.toUpperCase(),
-        company: formData.company.toUpperCase(),
-        category: formData.category.toUpperCase(),
-        subCategory: formData.subCategory.toUpperCase(),
         createdAt: serverTimestamp() 
       });
-      
-      setStatusMessage('SUCCESSFULLY SAVED!');
+      setStatusMessage('SUCCESS!');
       setTimeout(() => { setStatusMessage(''); setFormData(initialFormState); if(onComplete) onComplete(); }, 2000);
-    } catch (err) { alert("Cloud Error: " + err.message); setStatusMessage(''); }
+    } catch (err) { alert("Error: " + err.message); setStatusMessage(''); }
   };
 
   return (
     <div className="add-item-container">
       <style>{styles}</style>
-      
       <div className="layout-grid">
-        {/* LEFT: FORM SECTION */}
+        {/* FORM SECTION */}
         <div className="form-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', flexWrap: 'wrap', gap: '15px' }}>
             <h2 style={{ fontStyle: 'italic', fontWeight: '900', color: '#f59e0b', margin: 0, fontSize: '26px' }}>FLOWTRACK INVENTORY</h2>
             <div>
-              <button type="button" className="btn-top">Template</button>
+              <button type="button" className="btn-top" onClick={downloadTemplate}>Template</button>
               <button type="button" className="btn-top" style={{marginLeft:'10px'}} onClick={() => excelInputRef.current.click()}>Excel Import</button>
             </div>
           </div>
 
           <form onSubmit={handleSubmit} className="grid-row-all">
             <div className="input-group"><label className="label-text">Serial No</label><input className="readonly-input" value={formData.srNo} readOnly /></div>
-            
             <div className="input-group"><label className="label-text">SKU</label><input className="readonly-input" value={formData.sku} readOnly /></div>
-
-            <div className="input-group"><label className="label-text">Item Name *</label>
-              <input className="custom-input" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})} required />
-            </div>
+            <div className="input-group"><label className="label-text">Item Name *</label><input className="custom-input" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})} required /></div>
 
             <div className="input-group"><label className="label-text">Company *</label>
               <div style={{display:'flex'}}><select className="custom-input" value={formData.company} onChange={e=>setFormData({...formData, company: e.target.value.toUpperCase()})} required><option value="">Select Company</option>{companies.map(c=><option key={c} value={c}>{c}</option>)}</select><button type="button" onClick={()=>addOption('Company', companies, setCompanies)} className="btn-plus">+</button></div>
@@ -140,7 +132,6 @@ const AddItem = ({ editData, onComplete }) => {
             </div>
 
             <div className="input-group"><label className="label-text">Pcs Per Box *</label><input type="number" className="custom-input" value={formData.pcsPerBox} onChange={e=>setFormData({...formData, pcsPerBox: e.target.value})} required /></div>
-            
             <div className="input-group"><label className="label-text">Opening Stock</label><input type="number" className="custom-input" value={formData.openingStock} onChange={e=>setFormData({...formData, openingStock: e.target.value})} /></div>
 
             <div className="input-group"><label className="label-text">Volume (L x W x H) - IN INCHES</label>
@@ -152,22 +143,17 @@ const AddItem = ({ editData, onComplete }) => {
             </div>
 
             <div className="input-group"><label className="label-text">Weight (Grams per box)</label><input type="number" className="custom-input" value={formData.weight} onChange={e=>setFormData({...formData, weight: e.target.value})} /></div>
-
             <div className="input-group"><label className="label-text">Purchase Price *</label><input type="number" className="custom-input" value={formData.purchasePrice} onChange={e=>setFormData({...formData, purchasePrice: e.target.value})} required /></div>
-            
             <div className="input-group"><label className="label-text">Trade Price *</label><input type="number" className="custom-input" value={formData.tradePrice} onChange={e=>setFormData({...formData, tradePrice: e.target.value})} required /></div>
-            
             <div className="input-group"><label className="label-text">Retail Price *</label><input type="number" className="custom-input" value={formData.retailPrice} onChange={e=>setFormData({...formData, retailPrice: e.target.value})} required /></div>
-
             <div className="input-group"><label className="label-text">Min Stock *</label><input type="number" className="custom-input" value={formData.minStock} onChange={e=>setFormData({...formData, minStock: e.target.value})} required /></div>
-            
             <div className="input-group"><label className="label-text">Max Stock *</label><input type="number" className="custom-input" value={formData.maxStock} onChange={e=>setFormData({...formData, maxStock: e.target.value})} required /></div>
 
             <button type="submit" className="btn-main">{statusMessage || "SAVE ITEM TO CLOUD"}</button>
           </form>
         </div>
 
-        {/* RIGHT: PREVIEW CARD SECTION */}
+        {/* PREVIEW CARD */}
         <div className="preview-card">
           <div onClick={() => fileInputRef.current.click()} style={{ width: '100%', aspectRatio: '1/1', backgroundColor: '#1a1a1a', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', border: '1px solid #333', marginBottom: '20px' }}>
             {formData.imageUrl ? <img src={formData.imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Product" /> : <span style={{ color: '#444', fontSize: '24px', fontWeight: 'bold' }}>IMAGE PREVIEW</span>}
@@ -176,21 +162,17 @@ const AddItem = ({ editData, onComplete }) => {
           <h3 style={{ fontSize: '24px', fontWeight: '900', fontStyle: 'italic', margin: '10px 0' }}>{formData.name || "PRODUCT NAME"}</h3>
           <p style={{ color: '#f59e0b', fontSize: '15px', marginBottom: '25px', fontWeight: 'bold' }}>{formData.company || "COMPANY"}</p>
 
-          {/* QR and Barcode Stacked Vertically as requested */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            {/* QR Section */}
             <div style={{ backgroundColor: '#fff', padding: '15px', borderRadius: '15px', color: '#000' }}>
                <div style={{ fontSize: '20px', fontWeight: 'bold' }}>[ QR CODE ]</div>
-               <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#666' }}>SCAN FOR DETAILS</span>
+               <div style={{ fontSize: '9px', color: '#666', marginTop: '5px', wordBreak: 'break-all' }}>{formData.qrCodeData}</div>
             </div>
+            {/* Barcode Section */}
             <div style={{ backgroundColor: '#fff', padding: '15px', borderRadius: '15px', color: '#000' }}>
                <div style={{ fontSize: '18px', fontWeight: 'bold' }}>||||| || | |||</div>
-               <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#666' }}>{formData.barcodeData || 'BARCODE'}</span>
+               <div style={{ fontSize: '9px', color: '#666', marginTop: '5px', wordBreak: 'break-all' }}>{formData.barcodeData}</div>
             </div>
-          </div>
-
-          <div style={{ textAlign: 'left', background: '#000', padding: '15px', borderRadius: '15px', marginTop: '20px', border: '1px solid #222' }}>
-            <label className="label-text" style={{fontSize: '9px'}}>QR Text Reference</label>
-            <div style={{fontSize:'10px', color:'#888', wordBreak: 'break-all'}}>{formData.qrCodeData}</div>
           </div>
         </div>
       </div>

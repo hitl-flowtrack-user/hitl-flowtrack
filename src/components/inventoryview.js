@@ -30,7 +30,6 @@ const InventoryView = () => {
     .list-view th { background: #f59e0b; color: #000; padding: 12px; text-align: left; }
     .list-view td { padding: 12px; border-bottom: 1px solid #222; font-size: 14px; }
     
-    /* 3x Longer Buttons for List View */
     .btn-action { min-width: 120px; padding: 10px 15px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; font-size: 11px; text-transform: uppercase; transition: 0.3s; }
     .btn-edit { background: #3b82f6; color: #fff; }
     .btn-qr { background: #fff; color: #000; }
@@ -38,7 +37,7 @@ const InventoryView = () => {
     .btn-delete { background: #ef4444; color: #fff; }
     
     .button-group-pair { display: flex; gap: 8px; }
-    .pair-separator { margin-right: 25px; } /* Distance between pairs */
+    .pair-separator { margin-right: 25px; } 
 
     .edit-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 2000; overflow-y: auto; padding-top: 20px; }
     .close-edit { position: fixed; top: 20px; right: 20px; background: #ef4444; color: #fff; border: none; padding: 12px 24px; border-radius: 10px; font-weight: bold; z-index: 2100; cursor: pointer; }
@@ -72,9 +71,21 @@ const InventoryView = () => {
     }
   };
 
+  // FIX: Added White Border to Downloaded QR/Barcode
   const downloadAsset = (id, itemName, type) => {
     const canvas = document.getElementById(id);
-    const pngUrl = canvas.toDataURL("image/png");
+    const tempCanvas = document.createElement("canvas");
+    const ctx = tempCanvas.getContext("2d");
+    const padding = 40; 
+    
+    tempCanvas.width = canvas.width + padding;
+    tempCanvas.height = canvas.height + padding;
+    
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    ctx.drawImage(canvas, padding/2, padding/2);
+
+    const pngUrl = tempCanvas.toDataURL("image/png");
     let downloadLink = document.createElement("a");
     downloadLink.href = pngUrl;
     downloadLink.download = `${itemName}_${type}.png`;
@@ -149,13 +160,11 @@ const InventoryView = () => {
                   <td style={{color:'#f59e0b', fontWeight:'bold'}}>{item.retailPrice}</td>
                   <td>
                     <div style={{display:'flex', alignItems:'center'}}>
-                      {/* Pair 1: QR & Barcode */}
                       <div className="button-group-pair pair-separator">
                         <button className="btn-action btn-qr" onClick={() => downloadAsset(`qr-${item.id}`, item.name, 'QR')}>QR</button>
                         <button className="btn-action btn-barcode" onClick={() => downloadAsset(`bar-${item.id}`, item.name, 'BARCODE')}>BARCODE</button>
                       </div>
                       
-                      {/* Pair 2: Edit & Delete */}
                       <div className="button-group-pair">
                         <button className="btn-action btn-edit" onClick={() => setEditingItem(item)}>EDIT</button>
                         <button className="btn-action btn-delete" onClick={() => handleDelete(item.id)}>DELETE</button>
@@ -174,7 +183,6 @@ const InventoryView = () => {
         </div>
       )}
 
-      {/* EDIT OVERLAY */}
       {editingItem && (
         <div className="edit-overlay">
           <button className="close-edit" onClick={() => setEditingItem(null)}>✖ CANCEL EDIT</button>

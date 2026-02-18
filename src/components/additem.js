@@ -148,7 +148,7 @@ const AddItem = ({ editData, onComplete }) => {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="grid-row-all">
+          <form onSubmit={handleSubmit} className="grid-row-all" style={{alignItems: 'center'}}>
             {/* SR and SKU side-by-side in one line */}
             <div style={{ display: 'flex', gap: '15px', width: '60%', marginBottom: '20px' }}>
               <div style={{ flex: 1 }}><label className="label-text">Serial No</label><input className="readonly-input" value={formData.srNo} readOnly /></div>

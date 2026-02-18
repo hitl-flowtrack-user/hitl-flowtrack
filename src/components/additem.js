@@ -25,7 +25,6 @@ const AddItem = ({ editData, onComplete }) => {
 
   const [formData, setFormData] = useState(initialFormState);
 
-  // FIX 1: EDIT DATA LOADING (Purana data auto-fill karne ke liye)
   useEffect(() => {
     if (editData) {
       setFormData({ ...editData });
@@ -53,9 +52,15 @@ const AddItem = ({ editData, onComplete }) => {
   useEffect(() => {
     if (formData.name && !editData) {
       const nameUpper = formData.name.toUpperCase();
-      const vol = `${formData.length}x${formData.width}x${formData.height}`;
-      const bText = `SN:${formData.srNo}|PCS:${formData.pcsPerBox}|WT:${formData.weight}G|VOL:${vol}|PUR:${formData.purchasePrice}`;
-      const qText = `SKU:${formData.sku}|ITEM:${nameUpper}|CO:${formData.company.toUpperCase()}|CAT:${formData.category.toUpperCase()}|SUB:${formData.subCategory.toUpperCase()}`;
+      const vol = (formData.length && formData.width && formData.height) ? `${formData.length}x${formData.width}x${formData.height}` : '';
+      const weightStr = formData.weight ? `|WT:${formData.weight}G` : '';
+      const volStr = vol ? `|VOL:${vol}` : '';
+      
+      // Barcode Data: SR, SKU, PCS, VOL(opt), WT(opt), PUR, MIN, MAX
+      const bText = `SN:${formData.srNo}|SKU:${formData.sku}|PCS:${formData.pcsPerBox}${volStr}${weightStr}|PUR:${formData.purchasePrice}|MIN:${formData.minStock}|MAX:${formData.maxStock}`;
+      
+      // QR Data: Item Name, Company, Category, Sub-category, Pcs per box
+      const qText = `ITEM:${nameUpper}|CO:${formData.company.toUpperCase()}|CAT:${formData.category.toUpperCase()}|SUB:${formData.subCategory.toUpperCase()}|PCS:${formData.pcsPerBox}`;
       
       setFormData(prev => ({ 
         ...prev, 
@@ -64,55 +69,40 @@ const AddItem = ({ editData, onComplete }) => {
         qrCodeData: qText
       }));
     }
-  }, [formData.name, formData.company, formData.pcsPerBox, formData.weight, formData.length, formData.width, formData.height, formData.purchasePrice, editData]);
+  }, [formData.name, formData.company, formData.category, formData.subCategory, formData.pcsPerBox, formData.weight, formData.length, formData.width, formData.height, formData.purchasePrice, formData.minStock, formData.maxStock, editData]);
 
-  // FIX 2: EXCEL IMPORT COMPLETE DATA (Mapping all template fields correctly)
   const handleExcelImport = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setStatusMessage("IMPORTING COMPLETE DATA...");
+    setStatusMessage("IMPORTING...");
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
         const bstr = evt.target.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
-        const data = XLSX.utils.sheet_to_json(wb.Sheets[wsname]);
-        
+        const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
         const batch = writeBatch(db);
         data.forEach((item) => {
           const newDocRef = doc(collection(db, "inventory_records"));
           const sr = `SR-${Math.floor(1000 + Math.random() * 9000)}`;
           const name = (item["Item Name"] || "UNKNOWN").toUpperCase();
           const sku = `${name.substring(0, 3)}-${sr}`;
+          const vol = (item["Length"] && item["Width"] && item["Height"]) ? `${item["Length"]}x${item["Width"]}x${item["Height"]}` : '';
           
           batch.set(newDocRef, {
+            ...item,
             srNo: sr,
             sku: sku,
             name: name,
-            company: (item["Company"] || "GENERIC").toUpperCase(),
-            category: (item["Category"] || "GENERAL").toUpperCase(),
-            subCategory: (item["Sub-Category"] || "STANDARD").toUpperCase(),
-            pcsPerBox: item["Pcs Per Box"] || 0,
-            openingStock: item["Opening Stock"] || 0,
-            length: item["Length"] || 0,
-            width: item["Width"] || 0,
-            height: item["Height"] || 0,
-            weight: item["Weight"] || 0,
-            purchasePrice: item["Purchase Price"] || 0,
-            tradePrice: item["Trade Price"] || 0,
-            retailPrice: item["Retail Price"] || 0,
-            minStock: item["Min Stock"] || 0,
-            maxStock: item["Max Stock"] || 0,
-            barcodeData: `SN:${sr}|PCS:${item["Pcs Per Box"]}|WT:${item["Weight"]}G|VOL:${item["Length"]}x${item["Width"]}x${item["Height"]}|PUR:${item["Purchase Price"]}`,
-            qrCodeData: `SKU:${sku}|ITEM:${name}|CO:${item["Company"]}|CAT:${item["Category"]}`,
-            createdAt: serverTimestamp()
+            createdAt: serverTimestamp(),
+            barcodeData: `SN:${sr}|SKU:${sku}|PCS:${item["Pcs Per Box"]}${vol ? '|VOL:'+vol : ''}${item["Weight"] ? '|WT:'+item["Weight"]+'G' : ''}|PUR:${item["Purchase Price"]}|MIN:${item["Min Stock"]}|MAX:${item["Max Stock"]}`,
+            qrCodeData: `ITEM:${name}|CO:${(item["Company"]||'').toUpperCase()}|CAT:${(item["Category"]||'').toUpperCase()}|SUB:${(item["Sub-Category"]||'').toUpperCase()}|PCS:${item["Pcs Per Box"]}`
           });
         });
         await batch.commit();
-        setStatusMessage("ALL DATA IMPORTED!");
+        setStatusMessage("SUCCESS!");
         setTimeout(() => setStatusMessage(""), 3000);
-      } catch (err) { alert("Import Error: " + err.message); setStatusMessage(""); }
+      } catch (err) { alert(err.message); setStatusMessage(""); }
     };
     reader.readAsBinaryString(file);
   };
@@ -135,18 +125,15 @@ const AddItem = ({ editData, onComplete }) => {
     try {
       setStatusMessage('SAVING...');
       if (editData) {
-        // Update Logic
         await updateDoc(doc(db, "inventory_records", editData.id), { ...formData, updatedAt: serverTimestamp() });
-        setStatusMessage('UPDATED!');
       } else {
-        // Save Logic
         const qName = query(collection(db, "inventory_records"), where("name", "==", formData.name.toUpperCase()));
         const snap = await getDocs(qName);
         if (!snap.empty) { alert("Item Name already exists!"); setStatusMessage(''); return; }
         await addDoc(collection(db, "inventory_records"), { ...formData, createdAt: serverTimestamp() });
-        setStatusMessage('SAVED!');
       }
-      setTimeout(() => { setStatusMessage(''); if(onComplete) onComplete(); setFormData(initialFormState); }, 2000);
+      setStatusMessage('DONE!');
+      setTimeout(() => { setStatusMessage(''); if(onComplete) onComplete(); setFormData(initialFormState); }, 1500);
     } catch (err) { alert(err.message); setStatusMessage(''); }
   };
 
@@ -198,9 +185,6 @@ const AddItem = ({ editData, onComplete }) => {
             <div className="input-group"><label className="label-text">Min Stock *</label><input type="number" className="custom-input" value={formData.minStock} onChange={e=>setFormData({...formData, minStock: e.target.value})} required /></div>
             <div className="input-group"><label className="label-text">Max Stock *</label><input type="number" className="custom-input" value={formData.maxStock} onChange={e=>setFormData({...formData, maxStock: e.target.value})} required /></div>
             
-            <div className="input-group"><label className="label-text">Barcode Text (Read Only)</label><input className="readonly-input" value={formData.barcodeData} readOnly /></div>
-            <div className="input-group"><label className="label-text">QR Text (Read Only)</label><input className="readonly-input" value={formData.qrCodeData} readOnly /></div>
-
             <button type="submit" className="btn-main">{statusMessage || (editData ? "UPDATE ITEM" : "SAVE ITEM TO CLOUD")}</button>
           </form>
         </div>
@@ -213,9 +197,9 @@ const AddItem = ({ editData, onComplete }) => {
           <p style={{ color: '#f59e0b', fontWeight: 'bold' }}>{formData.company || "COMPANY"}</p>
 
           <div style={{ textAlign: 'left', background: '#000', padding: '15px', borderRadius: '15px', marginTop: '20px', border: '1px solid #222' }}>
-            <label className="label-text" style={{fontSize: '9px'}}>Barcode Text</label>
+            <label className="label-text" style={{fontSize: '9px'}}>Barcode Text Preview</label>
             <div style={{fontSize:'11px', color:'#f59e0b', marginBottom:'15px', wordBreak: 'break-all'}}>{formData.barcodeData}</div>
-            <label className="label-text" style={{fontSize: '9px'}}>QR Text</label>
+            <label className="label-text" style={{fontSize: '9px'}}>QR Text Preview</label>
             <div style={{fontSize:'10px', color:'#888', wordBreak: 'break-all'}}>{formData.qrCodeData}</div>
           </div>
         </div>

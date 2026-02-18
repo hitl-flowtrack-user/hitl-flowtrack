@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { db } from '../firebase'; 
-import { collection, addDoc, serverTimestamp, getDocs, query, where, writeBatch, doc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, where, writeBatch, doc, updateDoc } from "firebase/firestore";
 
 const AddItem = ({ editData, onComplete }) => {
   const fileInputRef = useRef(null);
@@ -25,6 +25,15 @@ const AddItem = ({ editData, onComplete }) => {
 
   const [formData, setFormData] = useState(initialFormState);
 
+  // FIX 1: EDIT DATA LOADING (Purana data auto-fill karne ke liye)
+  useEffect(() => {
+    if (editData) {
+      setFormData({ ...editData });
+    } else {
+      setFormData(initialFormState);
+    }
+  }, [editData]);
+
   const styles = `
     .add-item-container { background-color: #000; min-height: 100vh; padding: 20px; font-family: 'Segoe UI', sans-serif; color: #fff; }
     .layout-grid { display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 25px; max-width: 1200px; margin: 0 auto; }
@@ -41,12 +50,10 @@ const AddItem = ({ editData, onComplete }) => {
     @media (max-width: 900px) { .layout-grid { grid-template-columns: 1fr; } }
   `;
 
-  // Auto Generate Barcode & QR Professional Text
   useEffect(() => {
     if (formData.name && !editData) {
       const nameUpper = formData.name.toUpperCase();
       const vol = `${formData.length}x${formData.width}x${formData.height}`;
-      
       const bText = `SN:${formData.srNo}|PCS:${formData.pcsPerBox}|WT:${formData.weight}G|VOL:${vol}|PUR:${formData.purchasePrice}`;
       const qText = `SKU:${formData.sku}|ITEM:${nameUpper}|CO:${formData.company.toUpperCase()}|CAT:${formData.category.toUpperCase()}|SUB:${formData.subCategory.toUpperCase()}`;
       
@@ -59,11 +66,11 @@ const AddItem = ({ editData, onComplete }) => {
     }
   }, [formData.name, formData.company, formData.pcsPerBox, formData.weight, formData.length, formData.width, formData.height, formData.purchasePrice, editData]);
 
-  // Excel Import Logic
+  // FIX 2: EXCEL IMPORT COMPLETE DATA (Mapping all template fields correctly)
   const handleExcelImport = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setStatusMessage("IMPORTING...");
+    setStatusMessage("IMPORTING COMPLETE DATA...");
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
@@ -75,14 +82,35 @@ const AddItem = ({ editData, onComplete }) => {
         const batch = writeBatch(db);
         data.forEach((item) => {
           const newDocRef = doc(collection(db, "inventory_records"));
+          const sr = `SR-${Math.floor(1000 + Math.random() * 9000)}`;
+          const name = (item["Item Name"] || "UNKNOWN").toUpperCase();
+          const sku = `${name.substring(0, 3)}-${sr}`;
+          
           batch.set(newDocRef, {
-            ...item,
-            name: item["Item Name"]?.toUpperCase() || "UNKNOWN",
+            srNo: sr,
+            sku: sku,
+            name: name,
+            company: (item["Company"] || "GENERIC").toUpperCase(),
+            category: (item["Category"] || "GENERAL").toUpperCase(),
+            subCategory: (item["Sub-Category"] || "STANDARD").toUpperCase(),
+            pcsPerBox: item["Pcs Per Box"] || 0,
+            openingStock: item["Opening Stock"] || 0,
+            length: item["Length"] || 0,
+            width: item["Width"] || 0,
+            height: item["Height"] || 0,
+            weight: item["Weight"] || 0,
+            purchasePrice: item["Purchase Price"] || 0,
+            tradePrice: item["Trade Price"] || 0,
+            retailPrice: item["Retail Price"] || 0,
+            minStock: item["Min Stock"] || 0,
+            maxStock: item["Max Stock"] || 0,
+            barcodeData: `SN:${sr}|PCS:${item["Pcs Per Box"]}|WT:${item["Weight"]}G|VOL:${item["Length"]}x${item["Width"]}x${item["Height"]}|PUR:${item["Purchase Price"]}`,
+            qrCodeData: `SKU:${sku}|ITEM:${name}|CO:${item["Company"]}|CAT:${item["Category"]}`,
             createdAt: serverTimestamp()
           });
         });
         await batch.commit();
-        setStatusMessage("IMPORT SUCCESS!");
+        setStatusMessage("ALL DATA IMPORTED!");
         setTimeout(() => setStatusMessage(""), 3000);
       } catch (err) { alert("Import Error: " + err.message); setStatusMessage(""); }
     };
@@ -106,13 +134,19 @@ const AddItem = ({ editData, onComplete }) => {
     e.preventDefault();
     try {
       setStatusMessage('SAVING...');
-      const qName = query(collection(db, "inventory_records"), where("name", "==", formData.name.toUpperCase()));
-      const snap = await getDocs(qName);
-      if (!snap.empty) { alert("Item Name already exists!"); setStatusMessage(''); return; }
-
-      await addDoc(collection(db, "inventory_records"), { ...formData, createdAt: serverTimestamp() });
-      setStatusMessage('SAVED!');
-      setTimeout(() => { setStatusMessage(''); setFormData(initialFormState); }, 2000);
+      if (editData) {
+        // Update Logic
+        await updateDoc(doc(db, "inventory_records", editData.id), { ...formData, updatedAt: serverTimestamp() });
+        setStatusMessage('UPDATED!');
+      } else {
+        // Save Logic
+        const qName = query(collection(db, "inventory_records"), where("name", "==", formData.name.toUpperCase()));
+        const snap = await getDocs(qName);
+        if (!snap.empty) { alert("Item Name already exists!"); setStatusMessage(''); return; }
+        await addDoc(collection(db, "inventory_records"), { ...formData, createdAt: serverTimestamp() });
+        setStatusMessage('SAVED!');
+      }
+      setTimeout(() => { setStatusMessage(''); if(onComplete) onComplete(); setFormData(initialFormState); }, 2000);
     } catch (err) { alert(err.message); setStatusMessage(''); }
   };
 
@@ -167,7 +201,7 @@ const AddItem = ({ editData, onComplete }) => {
             <div className="input-group"><label className="label-text">Barcode Text (Read Only)</label><input className="readonly-input" value={formData.barcodeData} readOnly /></div>
             <div className="input-group"><label className="label-text">QR Text (Read Only)</label><input className="readonly-input" value={formData.qrCodeData} readOnly /></div>
 
-            <button type="submit" className="btn-main">{statusMessage || "SAVE ITEM TO CLOUD"}</button>
+            <button type="submit" className="btn-main">{statusMessage || (editData ? "UPDATE ITEM" : "SAVE ITEM TO CLOUD")}</button>
           </form>
         </div>
 

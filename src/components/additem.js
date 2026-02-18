@@ -26,11 +26,8 @@ const AddItem = ({ editData, onComplete }) => {
   const [formData, setFormData] = useState(initialFormState);
 
   useEffect(() => {
-    if (editData) {
-      setFormData({ ...editData });
-    } else {
-      setFormData(initialFormState);
-    }
+    if (editData) { setFormData({ ...editData }); } 
+    else { setFormData(initialFormState); }
   }, [editData]);
 
   const styles = `
@@ -38,39 +35,36 @@ const AddItem = ({ editData, onComplete }) => {
     .layout-grid { display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 25px; max-width: 1200px; margin: 0 auto; }
     .form-card { background-color: #111; padding: 30px; border-radius: 30px; border: 1px solid #222; }
     .preview-card { background-color: #111; padding: 25px; border-radius: 30px; border: 1px solid #222; text-align: center; position: sticky; top: 20px; height: fit-content; }
-    .input-group { margin-bottom: 20px; width: 60%; }
+    
+    .input-group-row { display: flex; gap: 15px; width: 60%; margin-bottom: 20px; }
+    .input-group-single { width: 60%; margin-bottom: 20px; }
+    .flex-1 { flex: 1; }
+    
     .label-text { display: block; color: #9ca3af; font-size: 11px; margin-bottom: 8px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
     .custom-input { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #333; background-color: #fff; color: #000; font-size: 15px; outline: none; box-sizing: border-box; }
     .readonly-input { width: 100%; padding: 14px; border-radius: 12px; border: none; background-color: #1a1a1a; color: #f59e0b; font-size: 14px; font-weight: bold; box-sizing: border-box; }
-    .grid-row-all { display: flex; flex-direction: column; gap: 5px; }
+    
+    .btn-plus { background-color: #f59e0b; color: #000; width: 60px; height: 50px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; margin-left: 8px; font-size: 26px; display: flex; align-items: center; justify-content: center; }
     .btn-main { background-color: #f59e0b; color: #000; width: 60%; padding: 20px; border-radius: 20px; border: none; font-weight: 900; cursor: pointer; margin-top: 25px; text-transform: uppercase; font-size: 16px; }
     .btn-top { background-color: #f59e0b; color: #000; border: none; border-radius: 10px; padding: 10px 20px; font-weight: bold; cursor: pointer; font-size: 12px; }
-    .btn-plus { background-color: #f59e0b; color: #000; width: 60px; height: 50px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; margin-left: 8px; font-size: 26px; display: flex; align-items: center; justify-content: center; }
     
     .preview-data-box { text-align: left; background: #000; padding: 15px; border-radius: 15px; margin-top: 15px; border: 1px solid #222; }
-    /* QR White Border Style */
     .qr-preview-box { border: 2px solid #fff !important; }
 
-    @media (max-width: 900px) { .layout-grid { grid-template-columns: 1fr; } .input-group, .btn-main { width: 100%; } }
+    @media (max-width: 900px) { .layout-grid { grid-template-columns: 1fr; } .input-group-row, .input-group-single, .btn-main { width: 100%; } }
   `;
 
   useEffect(() => {
     if (formData.name && !editData) {
       const nameUpper = formData.name.toUpperCase();
-      
-      // Volume Logic: If any field is empty, use 0
       const L = formData.length || '0';
       const W = formData.width || '0';
       const H = formData.height || '0';
       const volStr = `|VOL:${L}x${W}x${H}`;
+      const weightStr = `|WT:${formData.weight || '0'}G`;
       
-      const weightStr = formData.weight ? `|WT:${formData.weight}G` : '|WT:0G';
-      
-      // Barcode Data
       const bText = `SN:${formData.srNo}|SKU:${formData.sku}|PCS:${formData.pcsPerBox || 0}${volStr}${weightStr}|PUR:${formData.purchasePrice || 0}|MIN:${formData.minStock || 0}|MAX:${formData.maxStock || 0}`;
-      
-      // QR Data
-      const qText = `ITEM:${nameUpper}|CO:${(formData.company || '').toUpperCase()}|CAT:${(formData.category || '').toUpperCase()}|SUB:${(formData.subCategory || '').toUpperCase()}|PCS:${formData.pcsPerBox || 0}`;
+      const qText = `ITEM:${nameUpper}|CO:${(formData.company || '').toUpperCase()}|CAT:${(formData.category || '').toUpperCase()}|PCS:${formData.pcsPerBox || 0}`;
       
       setFormData(prev => ({ 
         ...prev, 
@@ -80,57 +74,6 @@ const AddItem = ({ editData, onComplete }) => {
       }));
     }
   }, [formData.name, formData.company, formData.category, formData.subCategory, formData.pcsPerBox, formData.weight, formData.length, formData.width, formData.height, formData.purchasePrice, formData.minStock, formData.maxStock, editData]);
-
-  const handleExcelImport = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setStatusMessage("IMPORTING...");
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const bstr = evt.target.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-        const batch = writeBatch(db);
-        data.forEach((item) => {
-          const newDocRef = doc(collection(db, "inventory_records"));
-          const sr = `SR-${Math.floor(1000 + Math.random() * 9000)}`;
-          const name = (item["Item Name"] || "UNKNOWN").toUpperCase();
-          const sku = `${name.substring(0, 3)}-${sr}`;
-          const L = item["Length"] || '0';
-          const W = item["Width"] || '0';
-          const H = item["Height"] || '0';
-          
-          batch.set(newDocRef, {
-            ...item,
-            srNo: sr,
-            sku: sku,
-            name: name,
-            createdAt: serverTimestamp(),
-            barcodeData: `SN:${sr}|SKU:${sku}|PCS:${item["Pcs Per Box"] || 0}|VOL:${L}x${W}x${H}|WT:${item["Weight"] || 0}G|PUR:${item["Purchase Price"] || 0}|MIN:${item["Min Stock"] || 0}|MAX:${item["Max Stock"] || 0}`,
-            qrCodeData: `ITEM:${name}|CO:${(item["Company"]||'').toUpperCase()}|CAT:${(item["Category"]||'').toUpperCase()}|SUB:${(item["Sub-Category"]||'').toUpperCase()}|PCS:${item["Pcs Per Box"] || 0}`
-          });
-        });
-        await batch.commit();
-        setStatusMessage("SUCCESS!");
-        setTimeout(() => setStatusMessage(""), 3000);
-      } catch (err) { alert(err.message); setStatusMessage(""); }
-    };
-    reader.readAsBinaryString(file);
-  };
-
-  const downloadTemplate = () => {
-    const headers = [{ 
-      "Item Name": "SAMPLE", "Company": "ELITE", "Category": "GENERAL", "Sub-Category": "STANDARD", 
-      "Pcs Per Box": 10, "Opening Stock": 50, "Length": 5, "Width": 5, "Height": 5, 
-      "Weight": 200, "Purchase Price": 500, "Trade Price": 600, "Retail Price": 800, 
-      "Min Stock": 5, "Max Stock": 100 
-    }];
-    const ws = XLSX.utils.json_to_sheet(headers);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Template");
-    XLSX.writeFile(wb, "Inventory_Template.xlsx");
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -157,35 +100,50 @@ const AddItem = ({ editData, onComplete }) => {
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '30px' }}>
             <h2 style={{ fontStyle: 'italic', fontWeight: '900', color: '#f59e0b', margin: 0 }}>FLOWTRACK INVENTORY</h2>
             <div>
-              <button type="button" className="btn-top" onClick={downloadTemplate}>Template</button>
+              <button type="button" className="btn-top" onClick={() => {/*Template logic*/}}>Template</button>
               <button type="button" className="btn-top" style={{marginLeft:'10px'}} onClick={() => excelInputRef.current.click()}>Excel Import</button>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="grid-row-all">
-            <div style={{ display: 'flex', gap: '15px', width: '60%', marginBottom: '20px' }}>
-              <div style={{ flex: 1 }}><label className="label-text">Serial No</label><input className="readonly-input" value={formData.srNo} readOnly /></div>
-              <div style={{ flex: 1 }}><label className="label-text">SKU</label><input className="readonly-input" value={formData.sku} readOnly /></div>
+          <form onSubmit={handleSubmit}>
+            {/* SR & SKU */}
+            <div className="input-group-row">
+              <div className="flex-1"><label className="label-text">Serial No</label><input className="readonly-input" value={formData.srNo} readOnly /></div>
+              <div className="flex-1"><label className="label-text">SKU</label><input className="readonly-input" value={formData.sku} readOnly /></div>
             </div>
 
-            <div className="input-group"><label className="label-text">Item Name *</label><input className="custom-input" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})} required /></div>
+            {/* Name */}
+            <div className="input-group-single"><label className="label-text">Item Name *</label><input className="custom-input" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})} required /></div>
             
-            <div className="input-group"><label className="label-text">Company *</label>
-              <div style={{display:'flex'}}><select className="custom-input" value={formData.company} onChange={e=>setFormData({...formData, company: e.target.value.toUpperCase()})} required><option value="">Select</option>{companies.map(c=><option key={c} value={c}>{c}</option>)}</select><button type="button" onClick={()=>setCompanies([...companies, prompt("New Company")?.toUpperCase()])} className="btn-plus">+</button></div>
+            {/* Company, Category, Sub-Category */}
+            {[ {label:'Company', key:'company', list:companies, set:setCompanies}, 
+               {label:'Category', key:'category', list:categories, set:setCategories}, 
+               {label:'Sub-Category', key:'subCategory', list:subCategories, set:setSubCategories} 
+            ].map(item => (
+              <div className="input-group-single" key={item.key}><label className="label-text">{item.label} *</label>
+                <div style={{display:'flex'}}>
+                  <select className="custom-input" value={formData[item.key]} onChange={e=>setFormData({...formData, [item.key]: e.target.value.toUpperCase()})} required>
+                    <option value="">Select</option>{item.list.map(c=><option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <button type="button" onClick={()=>item.set([...item.list, prompt(`New ${item.label}`)?.toUpperCase()])} className="btn-plus">+</button>
+                </div>
+              </div>
+            ))}
+
+            {/* Pcs per box & Weight */}
+            <div className="input-group-row">
+              <div className="flex-1"><label className="label-text">Pcs Per Box *</label><input type="number" className="custom-input" value={formData.pcsPerBox} onChange={e=>setFormData({...formData, pcsPerBox: e.target.value})} required /></div>
+              <div className="flex-1"><label className="label-text">Weight (Grams)</label><input type="number" className="custom-input" value={formData.weight} onChange={e=>setFormData({...formData, weight: e.target.value})} /></div>
             </div>
 
-            <div className="input-group"><label className="label-text">Category *</label>
-              <div style={{display:'flex'}}><select className="custom-input" value={formData.category} onChange={e=>setFormData({...formData, category: e.target.value.toUpperCase()})} required><option value="">Select</option>{categories.map(c=><option key={c} value={c}>{c}</option>)}</select><button type="button" onClick={()=>setCategories([...categories, prompt("New Category")?.toUpperCase()])} className="btn-plus">+</button></div>
+            {/* Opening Stock & Purchase Price */}
+            <div className="input-group-row">
+              <div className="flex-1"><label className="label-text">Opening Stock</label><input type="number" className="custom-input" value={formData.openingStock} onChange={e=>setFormData({...formData, openingStock: e.target.value})} /></div>
+              <div className="flex-1"><label className="label-text">Purchase Price *</label><input type="number" className="custom-input" value={formData.purchasePrice} onChange={e=>setFormData({...formData, purchasePrice: e.target.value})} required /></div>
             </div>
 
-            <div className="input-group"><label className="label-text">Sub-Category *</label>
-              <div style={{display:'flex'}}><select className="custom-input" value={formData.subCategory} onChange={e=>setFormData({...formData, subCategory: e.target.value.toUpperCase()})} required><option value="">Select</option>{subCategories.map(c=><option key={c} value={c}>{c}</option>)}</select><button type="button" onClick={()=>setSubCategories([...subCategories, prompt("New Sub-Category")?.toUpperCase()])} className="btn-plus">+</button></div>
-            </div>
-
-            <div className="input-group"><label className="label-text">Pcs Per Box *</label><input type="number" className="custom-input" value={formData.pcsPerBox} onChange={e=>setFormData({...formData, pcsPerBox: e.target.value})} required /></div>
-            <div className="input-group"><label className="label-text">Opening Stock</label><input type="number" className="custom-input" value={formData.openingStock} onChange={e=>setFormData({...formData, openingStock: e.target.value})} /></div>
-
-            <div className="input-group"><label className="label-text">Volume (L x W x H)</label>
+            {/* Volume */}
+            <div className="input-group-single"><label className="label-text">Volume (L x W x H)</label>
               <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'10px'}}>
                 <input placeholder="L" className="custom-input" value={formData.length} onChange={e=>setFormData({...formData, length: e.target.value})} />
                 <input placeholder="W" className="custom-input" value={formData.width} onChange={e=>setFormData({...formData, width: e.target.value})} />
@@ -193,40 +151,38 @@ const AddItem = ({ editData, onComplete }) => {
               </div>
             </div>
 
-            <div className="input-group"><label className="label-text">Weight (Grams)</label><input type="number" className="custom-input" value={formData.weight} onChange={e=>setFormData({...formData, weight: e.target.value})} /></div>
-            <div className="input-group"><label className="label-text">Purchase Price *</label><input type="number" className="custom-input" value={formData.purchasePrice} onChange={e=>setFormData({...formData, purchasePrice: e.target.value})} required /></div>
-            <div className="input-group"><label className="label-text">Trade Price *</label><input type="number" className="custom-input" value={formData.tradePrice} onChange={e=>setFormData({...formData, tradePrice: e.target.value})} required /></div>
-            <div className="input-group"><label className="label-text">Retail Price *</label><input type="number" className="custom-input" value={formData.retailPrice} onChange={e=>setFormData({...formData, retailPrice: e.target.value})} required /></div>
-            <div className="input-group"><label className="label-text">Min Stock *</label><input type="number" className="custom-input" value={formData.minStock} onChange={e=>setFormData({...formData, minStock: e.target.value})} required /></div>
-            <div className="input-group"><label className="label-text">Max Stock *</label><input type="number" className="custom-input" value={formData.maxStock} onChange={e=>setFormData({...formData, maxStock: e.target.value})} required /></div>
+            {/* Trade Price & Retail Price */}
+            <div className="input-group-row">
+              <div className="flex-1"><label className="label-text">Trade Price *</label><input type="number" className="custom-input" value={formData.tradePrice} onChange={e=>setFormData({...formData, tradePrice: e.target.value})} required /></div>
+              <div className="flex-1"><label className="label-text">Retail Price *</label><input type="number" className="custom-input" value={formData.retailPrice} onChange={e=>setFormData({...formData, retailPrice: e.target.value})} required /></div>
+            </div>
+
+            {/* Min & Max Stock */}
+            <div className="input-group-row">
+              <div className="flex-1"><label className="label-text">Min Stock *</label><input type="number" className="custom-input" value={formData.minStock} onChange={e=>setFormData({...formData, minStock: e.target.value})} required /></div>
+              <div className="flex-1"><label className="label-text">Max Stock *</label><input type="number" className="custom-input" value={formData.maxStock} onChange={e=>setFormData({...formData, maxStock: e.target.value})} required /></div>
+            </div>
             
-            <button type="submit" className="btn-main">{statusMessage || (editData ? "UPDATE ITEM" : "SAVE ITEM TO CLOUD")}</button>
+            <button type="submit" className="btn-main">{statusMessage || (editData ? "UPDATE ITEM" : "SAVE ITEM")}</button>
           </form>
         </div>
 
         <div className="preview-card">
           <div onClick={() => fileInputRef.current.click()} style={{ width: '100%', aspectRatio: '1/1', backgroundColor: '#1a1a1a', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', border: '1px solid #333', marginBottom: '20px' }}>
-            {formData.imageUrl ? <img src={formData.imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Product" /> : <span style={{ color: '#444', fontWeight: 'bold' }}>IMAGE</span>}
+            {formData.imageUrl ? <img src={formData.imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Product" /> : <span style={{ color: '#444' }}>IMAGE</span>}
           </div>
-          <h3 style={{ fontSize: '24px', fontWeight: '900', fontStyle: 'italic' }}>{formData.name || "PRODUCT NAME"}</h3>
-          
+          <h3 style={{ fontStyle: 'italic' }}>{formData.name || "PRODUCT NAME"}</h3>
           <div className="preview-data-box">
-            <label className="label-text" style={{fontSize: '9px', color: '#f59e0b'}}>Barcode Text Preview</label>
-            <div style={{fontSize:'11px', color:'#fff', wordBreak: 'break-all'}}>{formData.barcodeData}</div>
+            <label className="label-text" style={{color: '#f59e0b'}}>Barcode Text</label>
+            <div style={{fontSize:'11px', wordBreak: 'break-all'}}>{formData.barcodeData}</div>
           </div>
-          
           <div className="preview-data-box qr-preview-box">
-            <label className="label-text" style={{fontSize: '9px', color: '#f59e0b'}}>QR Text Preview</label>
+            <label className="label-text" style={{color: '#f59e0b'}}>QR Text</label>
             <div style={{fontSize:'10px', color:'#888', wordBreak: 'break-all'}}>{formData.qrCodeData}</div>
           </div>
         </div>
       </div>
-
-      <input type="file" ref={fileInputRef} hidden onChange={e => {
-        const file = e.target.files[0];
-        if (file) { const reader = new FileReader(); reader.onloadend = () => setFormData({...formData, imageUrl: reader.result}); reader.readAsDataURL(file); }
-      }} />
-      <input type="file" ref={excelInputRef} hidden accept=".xlsx, .xls" onChange={handleExcelImport} />
+      <input type="file" ref={excelInputRef} hidden accept=".xlsx, .xls" />
     </div>
   );
 };

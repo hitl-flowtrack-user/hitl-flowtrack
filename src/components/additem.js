@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { db } from '../firebase'; 
 import { collection, addDoc, serverTimestamp, getDocs, query, where, writeBatch, doc, updateDoc } from "firebase/firestore";
-import Barcode from 'react-barcode'; // Ensure 'npm install react-barcode' is run
 
 const AddItem = ({ editData, onComplete }) => {
   const fileInputRef = useRef(null);
@@ -39,22 +38,18 @@ const AddItem = ({ editData, onComplete }) => {
     .layout-grid { display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 25px; max-width: 1200px; margin: 0 auto; }
     .form-card { background-color: #111; padding: 30px; border-radius: 30px; border: 1px solid #222; }
     .preview-card { background-color: #111; padding: 25px; border-radius: 30px; border: 1px solid #222; text-align: center; position: sticky; top: 20px; height: fit-content; }
-    
-    /* Fields set to 60% as requested */
     .input-group { margin-bottom: 20px; width: 60%; }
-    
     .label-text { display: block; color: #9ca3af; font-size: 11px; margin-bottom: 8px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
     .custom-input { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #333; background-color: #fff; color: #000; font-size: 15px; outline: none; box-sizing: border-box; }
     .readonly-input { width: 100%; padding: 14px; border-radius: 12px; border: none; background-color: #1a1a1a; color: #f59e0b; font-size: 14px; font-weight: bold; box-sizing: border-box; }
     .grid-row-all { display: flex; flex-direction: column; gap: 5px; }
-    
-    /* 3x Upsize Plus Button */
-    .btn-plus { background-color: #f59e0b; color: #000; width: 65px; height: 50px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; margin-left: 8px; font-size: 26px; display: flex; align-items: center; justify-content: center; }
-    
     .btn-main { background-color: #f59e0b; color: #000; width: 60%; padding: 20px; border-radius: 20px; border: none; font-weight: 900; cursor: pointer; margin-top: 25px; text-transform: uppercase; font-size: 16px; }
     .btn-top { background-color: #f59e0b; color: #000; border: none; border-radius: 10px; padding: 10px 20px; font-weight: bold; cursor: pointer; font-size: 12px; }
+    .btn-plus { background-color: #f59e0b; color: #000; width: 60px; height: 50px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; margin-left: 8px; font-size: 26px; display: flex; align-items: center; justify-content: center; }
     
     .preview-data-box { text-align: left; background: #000; padding: 15px; border-radius: 15px; margin-top: 15px; border: 1px solid #222; }
+    /* QR White Border Style */
+    .qr-preview-box { border: 2px solid #fff !important; }
 
     @media (max-width: 900px) { .layout-grid { grid-template-columns: 1fr; } .input-group, .btn-main { width: 100%; } }
   `;
@@ -62,12 +57,20 @@ const AddItem = ({ editData, onComplete }) => {
   useEffect(() => {
     if (formData.name && !editData) {
       const nameUpper = formData.name.toUpperCase();
-      const vol = (formData.length && formData.width && formData.height) ? `${formData.length}x${formData.width}x${formData.height}` : '';
-      const weightStr = formData.weight ? `|WT:${formData.weight}G` : '';
-      const volStr = vol ? `|VOL:${vol}` : '';
       
-      const bText = `SN:${formData.srNo}|SKU:${formData.sku}|PCS:${formData.pcsPerBox}${volStr}${weightStr}|PUR:${formData.purchasePrice}|MIN:${formData.minStock}|MAX:${formData.maxStock}`;
-      const qText = `ITEM:${nameUpper}|CO:${formData.company.toUpperCase()}|CAT:${formData.category.toUpperCase()}|SUB:${formData.subCategory.toUpperCase()}|PCS:${formData.pcsPerBox}`;
+      // Volume Logic: If any field is empty, use 0
+      const L = formData.length || '0';
+      const W = formData.width || '0';
+      const H = formData.height || '0';
+      const volStr = `|VOL:${L}x${W}x${H}`;
+      
+      const weightStr = formData.weight ? `|WT:${formData.weight}G` : '|WT:0G';
+      
+      // Barcode Data
+      const bText = `SN:${formData.srNo}|SKU:${formData.sku}|PCS:${formData.pcsPerBox || 0}${volStr}${weightStr}|PUR:${formData.purchasePrice || 0}|MIN:${formData.minStock || 0}|MAX:${formData.maxStock || 0}`;
+      
+      // QR Data
+      const qText = `ITEM:${nameUpper}|CO:${(formData.company || '').toUpperCase()}|CAT:${(formData.category || '').toUpperCase()}|SUB:${(formData.subCategory || '').toUpperCase()}|PCS:${formData.pcsPerBox || 0}`;
       
       setFormData(prev => ({ 
         ...prev, 
@@ -94,12 +97,18 @@ const AddItem = ({ editData, onComplete }) => {
           const sr = `SR-${Math.floor(1000 + Math.random() * 9000)}`;
           const name = (item["Item Name"] || "UNKNOWN").toUpperCase();
           const sku = `${name.substring(0, 3)}-${sr}`;
-          const vol = (item["Length"] && item["Width"] && item["Height"]) ? `${item["Length"]}x${item["Width"]}x${item["Height"]}` : '';
+          const L = item["Length"] || '0';
+          const W = item["Width"] || '0';
+          const H = item["Height"] || '0';
+          
           batch.set(newDocRef, {
             ...item,
-            srNo: sr, sku: sku, name: name, createdAt: serverTimestamp(),
-            barcodeData: `SN:${sr}|SKU:${sku}|PCS:${item["Pcs Per Box"]}${vol ? '|VOL:'+vol : ''}${item["Weight"] ? '|WT:'+item["Weight"]+'G' : ''}|PUR:${item["Purchase Price"]}|MIN:${item["Min Stock"]}|MAX:${item["Max Stock"]}`,
-            qrCodeData: `ITEM:${name}|CO:${(item["Company"]||'').toUpperCase()}|CAT:${(item["Category"]||'').toUpperCase()}|SUB:${(item["Sub-Category"]||'').toUpperCase()}|PCS:${item["Pcs Per Box"]}`
+            srNo: sr,
+            sku: sku,
+            name: name,
+            createdAt: serverTimestamp(),
+            barcodeData: `SN:${sr}|SKU:${sku}|PCS:${item["Pcs Per Box"] || 0}|VOL:${L}x${W}x${H}|WT:${item["Weight"] || 0}G|PUR:${item["Purchase Price"] || 0}|MIN:${item["Min Stock"] || 0}|MAX:${item["Max Stock"] || 0}`,
+            qrCodeData: `ITEM:${name}|CO:${(item["Company"]||'').toUpperCase()}|CAT:${(item["Category"]||'').toUpperCase()}|SUB:${(item["Sub-Category"]||'').toUpperCase()}|PCS:${item["Pcs Per Box"] || 0}`
           });
         });
         await batch.commit();
@@ -111,7 +120,12 @@ const AddItem = ({ editData, onComplete }) => {
   };
 
   const downloadTemplate = () => {
-    const headers = [{ "Item Name": "SAMPLE", "Company": "ELITE", "Category": "GENERAL", "Sub-Category": "STANDARD", "Pcs Per Box": 10, "Opening Stock": 50, "Length": 5, "Width": 5, "Height": 5, "Weight": 200, "Purchase Price": 500, "Trade Price": 600, "Retail Price": 800, "Min Stock": 5, "Max Stock": 100 }];
+    const headers = [{ 
+      "Item Name": "SAMPLE", "Company": "ELITE", "Category": "GENERAL", "Sub-Category": "STANDARD", 
+      "Pcs Per Box": 10, "Opening Stock": 50, "Length": 5, "Width": 5, "Height": 5, 
+      "Weight": 200, "Purchase Price": 500, "Trade Price": 600, "Retail Price": 800, 
+      "Min Stock": 5, "Max Stock": 100 
+    }];
     const ws = XLSX.utils.json_to_sheet(headers);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Template");
@@ -148,8 +162,7 @@ const AddItem = ({ editData, onComplete }) => {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="grid-row-all" style={{alignItems: 'center'}}>
-            {/* SR and SKU side-by-side in one line */}
+          <form onSubmit={handleSubmit} className="grid-row-all">
             <div style={{ display: 'flex', gap: '15px', width: '60%', marginBottom: '20px' }}>
               <div style={{ flex: 1 }}><label className="label-text">Serial No</label><input className="readonly-input" value={formData.srNo} readOnly /></div>
               <div style={{ flex: 1 }}><label className="label-text">SKU</label><input className="readonly-input" value={formData.sku} readOnly /></div>
@@ -172,7 +185,7 @@ const AddItem = ({ editData, onComplete }) => {
             <div className="input-group"><label className="label-text">Pcs Per Box *</label><input type="number" className="custom-input" value={formData.pcsPerBox} onChange={e=>setFormData({...formData, pcsPerBox: e.target.value})} required /></div>
             <div className="input-group"><label className="label-text">Opening Stock</label><input type="number" className="custom-input" value={formData.openingStock} onChange={e=>setFormData({...formData, openingStock: e.target.value})} /></div>
 
-            <div className="input-group"><label className="label-text">Volume (L x W x H) - INCHES</label>
+            <div className="input-group"><label className="label-text">Volume (L x W x H)</label>
               <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'10px'}}>
                 <input placeholder="L" className="custom-input" value={formData.length} onChange={e=>setFormData({...formData, length: e.target.value})} />
                 <input placeholder="W" className="custom-input" value={formData.width} onChange={e=>setFormData({...formData, width: e.target.value})} />
@@ -202,7 +215,7 @@ const AddItem = ({ editData, onComplete }) => {
             <div style={{fontSize:'11px', color:'#fff', wordBreak: 'break-all'}}>{formData.barcodeData}</div>
           </div>
           
-          <div className="preview-data-box">
+          <div className="preview-data-box qr-preview-box">
             <label className="label-text" style={{fontSize: '9px', color: '#f59e0b'}}>QR Text Preview</label>
             <div style={{fontSize:'10px', color:'#888', wordBreak: 'break-all'}}>{formData.qrCodeData}</div>
           </div>

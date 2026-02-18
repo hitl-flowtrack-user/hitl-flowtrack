@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase'; 
 import { collection, query, onSnapshot, doc, deleteDoc } from "firebase/firestore";
 import { QRCodeCanvas } from 'qrcode.react';
-import Barcode from 'react-barcode'; 
 import AddItem from './additem'; 
 
 const InventoryView = () => {
@@ -21,51 +20,86 @@ const InventoryView = () => {
   const styles = `
     .inventory-container { background-color: #000; min-height: 100vh; padding: 20px; color: #fff; font-family: 'Segoe UI', sans-serif; }
     .filter-section { background: #111; padding: 20px; border-radius: 20px; border: 1px solid #222; margin-bottom: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-    .filter-input { background: #fff; color: #000; border: none; padding: 12px; border-radius: 10px; font-size: 13px; outline: none; }
+    .filter-input { background: #fff; color: #000; border: none; padding: 10px; border-radius: 8px; font-size: 13px; outline: none; }
     .view-toggle { background: #f59e0b; color: #000; padding: 10px 20px; border-radius: 10px; font-weight: bold; cursor: pointer; border: none; }
+    
     .grid-view { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
     .item-card { background: #111; padding: 20px; border-radius: 25px; border: 1px solid #222; text-align: center; }
     
-    .list-view-table { width: 100%; border-collapse: collapse; background: #111; border-radius: 15px; overflow: hidden; margin-top: 10px; }
-    .list-view-table th { background: #f59e0b; color: #000; padding: 15px; text-align: left; font-size: 12px; }
-    .list-view-table td { padding: 15px; border-bottom: 1px solid #222; font-size: 14px; }
+    .list-view { width: 100%; border-collapse: collapse; background: #111; border-radius: 15px; overflow: hidden; }
+    .list-view th { background: #f59e0b; color: #000; padding: 12px; text-align: left; }
+    .list-view td { padding: 12px; border-bottom: 1px solid #222; font-size: 14px; }
     
-    .btn-action { padding: 10px 15px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; font-size: 10px; text-transform: uppercase; flex: 1; }
+    .btn-action { min-width: 120px; padding: 10px 15px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; font-size: 11px; text-transform: uppercase; transition: 0.3s; }
     .btn-edit { background: #3b82f6; color: #fff; }
     .btn-qr { background: #fff; color: #000; }
     .btn-barcode { background: #10b981; color: #fff; }
     .btn-delete { background: #ef4444; color: #fff; }
     
-    .barcode-container { background: #fff; padding: 5px; border-radius: 5px; display: inline-block; margin-top: 10px; }
+    .button-group-pair { display: flex; gap: 8px; }
+    .pair-separator { margin-right: 25px; } 
+
     .edit-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 2000; overflow-y: auto; padding-top: 20px; }
+    .close-edit { position: fixed; top: 20px; right: 20px; background: #ef4444; color: #fff; border: none; padding: 12px 24px; border-radius: 10px; font-weight: bold; z-index: 2100; cursor: pointer; }
   `;
 
   useEffect(() => {
     const q = query(collection(db, "inventory_records"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setItems(data);
     });
     return () => unsubscribe();
   }, []);
 
-  // Filter Logic
   useEffect(() => {
     let result = items.filter(item => {
-      const nameMatch = (item.name || '').toLowerCase().includes(searchTerm.toLowerCase());
-      const coMatch = filterCompany ? (item.company || '') === filterCompany : true;
-      const catMatch = filterCategory ? (item.category || '') === filterCategory : true;
+      const nameMatch = item.name?.toLowerCase().includes(searchTerm.toLowerCase());
+      const companyMatch = filterCompany ? item.company === filterCompany : true;
+      const catMatch = filterCategory ? item.category === filterCategory : true;
       const priceVal = parseFloat(item.retailPrice || 0);
-      const priceMatch = (minPrice ? priceVal >= parseFloat(minPrice) : true) && (maxPrice ? priceVal <= parseFloat(maxPrice) : true);
-      return nameMatch && coMatch && catMatch && priceMatch;
+      const priceMatch = (minPrice ? priceVal >= parseFloat(minPrice) : true) && 
+                         (maxPrice ? priceVal <= parseFloat(maxPrice) : true);
+      return nameMatch && companyMatch && catMatch && priceMatch;
     });
     setFilteredItems(result);
   }, [searchTerm, filterCompany, filterCategory, minPrice, maxPrice, items]);
 
+  const handleDelete = async (id) => {
+    if(window.confirm("Are you sure you want to delete this item?")) {
+      await deleteDoc(doc(db, "inventory_records", id));
+    }
+  };
+
+  // FIX: Added White Border to Downloaded QR/Barcode
+  const downloadAsset = (id, itemName, type) => {
+    const canvas = document.getElementById(id);
+    const tempCanvas = document.createElement("canvas");
+    const ctx = tempCanvas.getContext("2d");
+    const padding = 40; 
+    
+    tempCanvas.width = canvas.width + padding;
+    tempCanvas.height = canvas.height + padding;
+    
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    ctx.drawImage(canvas, padding/2, padding/2);
+
+    const pngUrl = tempCanvas.toDataURL("image/png");
+    let downloadLink = document.createElement("a");
+    downloadLink.href = pngUrl;
+    downloadLink.download = `${itemName}_${type}.png`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+  };
+
   return (
     <div className="inventory-container">
       <style>{styles}</style>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-        <h2 style={{ color: '#f59e0b', fontStyle: 'italic', fontWeight: '900' }}>FLOWTRACK EXPLORER</h2>
+      
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+        <h2 style={{ color: '#f59e0b', fontStyle: 'italic', fontWeight: '900', fontSize: '24px' }}>FLOWTRACK EXPLORER</h2>
         <button className="view-toggle" onClick={() => setViewType(viewType === 'grid' ? 'list' : 'grid')}>
           {viewType === 'grid' ? 'SWITCH TO LIST' : 'SWITCH TO GRID'}
         </button>
@@ -83,37 +117,64 @@ const InventoryView = () => {
         <div className="grid-view">
           {filteredItems.map(item => (
             <div key={item.id} className="item-card">
-              <div style={{ height: '150px', background: '#000', borderRadius: '15px', overflow: 'hidden', border: '1px solid #222' }}>
-                {item.imageUrl && <img src={item.imageUrl} style={{width:'100%', height:'100%', objectFit:'cover'}} alt="p" />}
+              <div style={{ height: '180px', background: '#000', borderRadius: '15px', marginBottom: '10px', overflow: 'hidden', border: '1px solid #222' }}>
+                {item.imageUrl ? <img src={item.imageUrl} style={{width:'100%', height:'100%', objectFit:'cover'}} alt="p" /> : <div style={{paddingTop:'70px', color:'#333'}}>NO IMAGE</div>}
               </div>
-              <h4 style={{margin:'10px 0'}}>{item.name}</h4>
+              <h4 style={{margin:'5px 0', fontSize: '18px'}}>{item.name}</h4>
+              <p style={{color:'#f59e0b', fontWeight: 'bold'}}>{item.retailPrice} PKR</p>
               
-              <div className="barcode-container">
-                <Barcode value={item.barcodeData || "0"} width={1.0} height={35} fontSize={8} margin={0} />
-              </div>
-
-              <div style={{display:'flex', gap:'5px', marginTop:'15px'}}>
-                <button className="btn-action btn-edit" onClick={() => setEditingItem(item)}>Edit</button>
-                <button className="btn-action btn-delete" onClick={() => deleteDoc(doc(db, "inventory_records", item.id))}>Del</button>
+              <div style={{marginTop:'15px', display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center'}}>
+                <div className="button-group-pair">
+                  <button className="btn-action btn-qr" onClick={() => downloadAsset(`qr-${item.id}`, item.name, 'QR')}>QR</button>
+                  <button className="btn-action btn-barcode" onClick={() => downloadAsset(`bar-${item.id}`, item.name, 'BARCODE')}>BARCODE</button>
+                </div>
+                <div className="button-group-pair">
+                  <button className="btn-action btn-edit" onClick={() => setEditingItem(item)}>EDIT</button>
+                  <button className="btn-action btn-delete" onClick={() => handleDelete(item.id)}>DELETE</button>
+                </div>
+                
+                <div style={{display:'none'}}>
+                  <QRCodeCanvas id={`qr-${item.id}`} value={item.qrCodeData} size={256} />
+                  <QRCodeCanvas id={`bar-${item.id}`} value={item.barcodeData} size={256} />
+                </div>
               </div>
             </div>
           ))}
         </div>
       ) : (
         <div style={{overflowX:'auto'}}>
-          <table className="list-view-table">
+          <table className="list-view">
             <thead>
               <tr>
-                <th>NAME</th><th>COMPANY</th><th>PRICE</th><th>STOCK</th><th>ACTION</th>
+                <th>Item Name</th>
+                <th>Company</th>
+                <th>Price</th>
+                <th>Actions Control</th>
               </tr>
             </thead>
             <tbody>
               {filteredItems.map(item => (
                 <tr key={item.id}>
-                  <td>{item.name}</td><td>{item.company}</td><td>{item.retailPrice}</td><td>{item.openingStock}</td>
-                  <td style={{display:'flex', gap:'5px'}}>
-                    <button className="btn-action btn-edit" onClick={() => setEditingItem(item)}>Edit</button>
-                    <button className="btn-action btn-delete" onClick={() => deleteDoc(doc(db, "inventory_records", item.id))}>Del</button>
+                  <td style={{fontWeight:'bold'}}>{item.name}</td>
+                  <td>{item.company}</td>
+                  <td style={{color:'#f59e0b', fontWeight:'bold'}}>{item.retailPrice}</td>
+                  <td>
+                    <div style={{display:'flex', alignItems:'center'}}>
+                      <div className="button-group-pair pair-separator">
+                        <button className="btn-action btn-qr" onClick={() => downloadAsset(`qr-${item.id}`, item.name, 'QR')}>QR</button>
+                        <button className="btn-action btn-barcode" onClick={() => downloadAsset(`bar-${item.id}`, item.name, 'BARCODE')}>BARCODE</button>
+                      </div>
+                      
+                      <div className="button-group-pair">
+                        <button className="btn-action btn-edit" onClick={() => setEditingItem(item)}>EDIT</button>
+                        <button className="btn-action btn-delete" onClick={() => handleDelete(item.id)}>DELETE</button>
+                      </div>
+                    </div>
+
+                    <div style={{display:'none'}}>
+                      <QRCodeCanvas id={`qr-${item.id}`} value={item.qrCodeData} size={256} />
+                      <QRCodeCanvas id={`bar-${item.id}`} value={item.barcodeData} size={256} />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -124,8 +185,13 @@ const InventoryView = () => {
 
       {editingItem && (
         <div className="edit-overlay">
-          <button style={{position:'fixed', top:'20px', right:'20px', zIndex:3000, background:'#ef4444', color:'#fff', border:'none', padding:'10px 20px', borderRadius:'10px'}} onClick={() => setEditingItem(null)}>CLOSE</button>
-          <AddItem editData={editingItem} onComplete={() => setEditingItem(null)} />
+          <button className="close-edit" onClick={() => setEditingItem(null)}>✖ CANCEL EDIT</button>
+          <AddItem 
+            editData={editingItem} 
+            onComplete={() => {
+              setEditingItem(null);
+            }} 
+          />
         </div>
       )}
     </div>

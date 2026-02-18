@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
-import App from './App';
+import App from './app'; // Ensure yahan 'app' small letters mein ho kyunke file 'app.js' hai
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

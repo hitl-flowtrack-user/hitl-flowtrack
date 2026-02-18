@@ -10,7 +10,6 @@ const InventoryView = () => {
   const [viewType, setViewType] = useState('grid'); 
   const [editingItem, setEditingItem] = useState(null);
 
-  // Filters State
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCompany, setFilterCompany] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
@@ -71,9 +70,10 @@ const InventoryView = () => {
     }
   };
 
-  // FIX: Added White Border to Downloaded QR/Barcode
   const downloadAsset = (id, itemName, type) => {
     const canvas = document.getElementById(id);
+    if (!canvas) return;
+
     const tempCanvas = document.createElement("canvas");
     const ctx = tempCanvas.getContext("2d");
     const padding = 40; 

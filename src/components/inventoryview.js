@@ -1,119 +1,152 @@
+// inventoryview.js
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebase';
-import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { db } from './firebase';
+import { collection, query, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { QRCodeCanvas } from 'qrcode.react';
+import JsBarcode from 'jsbarcode';
 
 const InventoryView = () => {
   const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [filteredItems, setFilteredItems] = useState([]);
+  const [viewType, setViewType] = useState('list'); // 'list' or 'grid'
+  const [editingItem, setEditingItem] = useState(null);
+  
+  // Filters State
+  const [filters, setFilters] = useState({
+    category: '',
+    subCategory: '',
+    minPrice: '',
+    maxPrice: '',
+    company: ''
+  });
 
   useEffect(() => {
-    // Collection name 'inventory_records' jo additem.js mein bhi hai
-    const q = query(collection(db, "inventory_records"), orderBy("createdAt", "desc"));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const itemList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setItems(itemList);
-      setLoading(false);
-    }, (error) => {
-      console.error("Firebase Error:", error);
-      setLoading(false);
+    const q = query(collection(db, "inventory"));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const itemsData = [];
+      querySnapshot.forEach((doc) => {
+        itemsData.push({ id: doc.id, ...doc.data() });
+      });
+      setItems(itemsData);
+      setFilteredItems(itemsData);
     });
-
     return () => unsubscribe();
   }, []);
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this item?")) {
-      try {
-        await deleteDoc(doc(db, "inventory_records", id));
-      } catch (err) {
-        alert("Delete failed: " + err.message);
-      }
+  // Filter Logic
+  useEffect(() => {
+    let result = items.filter(item => {
+      const matchCategory = filters.category ? item.category === filters.category : true;
+      const matchSubCategory = filters.subCategory ? item.subCategory === filters.subCategory : true;
+      const matchCompany = filters.company ? item.company?.toLowerCase().includes(filters.company.toLowerCase()) : true;
+      const price = parseFloat(item.retailPrice || 0);
+      const matchMinPrice = filters.minPrice ? price >= parseFloat(filters.minPrice) : true;
+      const matchMaxPrice = filters.maxPrice ? price <= parseFloat(filters.maxPrice) : true;
+      
+      return matchCategory && matchSubCategory && matchCompany && matchMinPrice && matchMaxPrice;
+    });
+    setFilteredItems(result);
+  }, [filters, items]);
+
+  const handleDownloadQR = (id) => {
+    const canvas = document.getElementById(`qr-${id}`);
+    const url = canvas.toDataURL("image/png");
+    const link = document.createElement('a');
+    link.download = `QR-${id}.png`;
+    link.href = url;
+    link.click();
+  };
+
+  const handleEdit = (item) => {
+    setEditingItem({ ...item });
+  };
+
+  const saveEdit = async () => {
+    if (editingItem) {
+      const itemRef = doc(db, "inventory", editingItem.id);
+      await updateDoc(itemRef, editingItem);
+      setEditingItem(null);
+      alert("Item updated successfully!");
     }
   };
 
   return (
-    <div style={{ backgroundColor: '#000', minHeight: '100vh', padding: '20px', color: '#fff', fontFamily: 'sans-serif' }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        
-        {/* Header Section */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-          <div>
-            <h2 style={{ fontSize: '28px', fontWeight: '900', fontStyle: 'italic', color: '#f59e0b', margin: 0 }}>LIVE INVENTORY</h2>
-            <p style={{ fontSize: '10px', color: '#444', letterSpacing: '2px' }}>REAL-TIME STOCK TRACKING</p>
-          </div>
-          <div style={{ backgroundColor: '#111', padding: '10px 20px', borderRadius: '15px', border: '1px solid #222' }}>
-            <span style={{ fontSize: '12px', color: '#666' }}>TOTAL ITEMS: </span>
-            <span style={{ fontWeight: 'bold', color: '#f59e0b' }}>{items.length}</span>
+    <div className="p-4">
+      <h2 className="text-2xl font-bold mb-4">Inventory Management</h2>
+      
+      {/* Filters Section */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-6 bg-gray-100 p-4 rounded">
+        <input type="text" placeholder="Company" className="p-2 border" onChange={(e) => setFilters({...filters, company: e.target.value})} />
+        <select className="p-2 border" onChange={(e) => setFilters({...filters, category: e.target.value})}>
+          <option value="">All Categories</option>
+          <option value="Grocery">Grocery</option>
+          {/* Add more categories dynamically */}
+        </select>
+        <input type="number" placeholder="Min Price" className="p-2 border" onChange={(e) => setFilters({...filters, minPrice: e.target.value})} />
+        <input type="number" placeholder="Max Price" className="p-2 border" onChange={(e) => setFilters({...filters, maxPrice: e.target.value})} />
+        <button onClick={() => setViewType(viewType === 'list' ? 'grid' : 'list')} className="bg-blue-500 text-white p-2 rounded">
+          Switch to {viewType === 'list' ? 'Grid' : 'List'} View
+        </button>
+      </div>
+
+      {/* View Logic */}
+      {viewType === 'list' ? (
+        <table className="w-full border-collapse border">
+          <thead>
+            <tr className="bg-gray-200">
+              <th className="border p-2">Item Name</th>
+              <th className="border p-2">Category</th>
+              <th className="border p-2">Price</th>
+              <th className="border p-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredItems.map(item => (
+              <tr key={item.id}>
+                <td className="border p-2">{item.itemName}</td>
+                <td className="border p-2">{item.category}</td>
+                <td className="border p-2">{item.retailPrice}</td>
+                <td className="border p-2 space-x-2">
+                  <button onClick={() => handleEdit(item)} className="bg-yellow-500 text-white px-2 py-1 rounded">Edit</button>
+                  <button onClick={() => handleDownloadQR(item.id)} className="bg-green-500 text-white px-2 py-1 rounded">QR</button>
+                  <QRCodeCanvas id={`qr-${item.id}`} value={item.id} size={50} style={{display: 'none'}} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {filteredItems.map(item => (
+            <div key={item.id} className="border p-4 rounded shadow">
+              <h3 className="font-bold">{item.itemName}</h3>
+              <p>Category: {item.category}</p>
+              <p>Price: {item.retailPrice}</p>
+              <div className="mt-2 space-x-2">
+                <button onClick={() => handleEdit(item)} className="bg-yellow-500 text-white px-2 py-1 rounded">Edit</button>
+                <button onClick={() => handleDownloadQR(item.id)} className="bg-green-500 text-white px-2 py-1 rounded">QR</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editingItem && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white p-6 rounded shadow-lg w-96">
+            <h3 className="text-xl font-bold mb-4">Edit Item</h3>
+            <input className="w-full border p-2 mb-2" value={editingItem.itemName} onChange={(e) => setEditingItem({...editingItem, itemName: e.target.value})} placeholder="Item Name" />
+            <input className="w-full border p-2 mb-2" value={editingItem.retailPrice} onChange={(e) => setEditingItem({...editingItem, retailPrice: e.target.value})} placeholder="Price" />
+            <div className="flex justify-end space-x-2">
+              <button onClick={() => setEditingItem(null)} className="bg-gray-400 text-white p-2 rounded">Cancel</button>
+              <button onClick={saveEdit} className="bg-blue-600 text-white p-2 rounded">Save Changes</button>
+            </div>
           </div>
         </div>
-
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '50px', color: '#f59e0b', fontWeight: 'bold' }}>SYNCING WITH CLOUD...</div>
-        ) : (
-          <div style={{ overflowX: 'auto', backgroundColor: '#0a0a0a', borderRadius: '25px', border: '1px solid #1a1a1a' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#111', borderBottom: '2px solid #222' }}>
-                  <th style={thStyle}>IMAGE</th>
-                  <th style={thStyle}>ITEM DETAILS</th>
-                  <th style={thStyle}>CATEGORY / SKU</th>
-                  <th style={thStyle}>RETAIL PRICE</th>
-                  <th style={thStyle}>ACTION</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.length > 0 ? items.map((item) => (
-                  <tr key={item.id} style={{ borderBottom: '1px solid #161616', transition: '0.3s' }}>
-                    <td style={tdStyle}>
-                      <div style={{ width: '50px', height: '50px', backgroundColor: '#1a1a1a', borderRadius: '10px', overflow: 'hidden' }}>
-                        {item.imageUrl ? (
-                          <img src={item.imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="pic" />
-                        ) : (
-                          <div style={{ fontSize: '8px', padding: '15px', color: '#333' }}>NO IMG</div>
-                        )}
-                      </div>
-                    </td>
-                    <td style={tdStyle}>
-                      <div style={{ fontWeight: 'bold', color: '#fff', textTransform: 'uppercase' }}>{item.itemName || item.name}</div>
-                      <div style={{ fontSize: '11px', color: '#666' }}>{item.company}</div>
-                    </td>
-                    <td style={tdStyle}>
-                      <div style={{ fontSize: '13px' }}>{item.category}</div>
-                      <div style={{ fontSize: '10px', color: '#f59e0b' }}>{item.sku}</div>
-                    </td>
-                    <td style={tdStyle}>
-                      <div style={{ fontWeight: 'bold', color: '#10b981' }}>Rs. {item.retailPrice || 0}</div>
-                    </td>
-                    <td style={tdStyle}>
-                      <button 
-                        onClick={() => handleDelete(item.id)}
-                        style={{ background: 'none', border: 'none', color: '#ff4444', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}
-                      >
-                        DELETE
-                      </button>
-                    </td>
-                  </tr>
-                )) : (
-                  <tr>
-                    <td colSpan="5" style={{ textAlign: 'center', padding: '100px', color: '#333', fontSize: '14px', fontWeight: 'bold' }}>
-                      DATABASE IS EMPTY. PLEASE ADD ITEMS.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 };
-
-const thStyle = { padding: '20px', fontSize: '11px', color: '#444', letterSpacing: '1px', textTransform: 'uppercase' };
-const tdStyle = { padding: '20px', fontSize: '14px' };
 
 export default InventoryView;

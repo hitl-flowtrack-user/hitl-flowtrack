@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase'; 
-import { collection, query, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, query, onSnapshot, doc, deleteDoc } from "firebase/firestore";
 import { QRCodeCanvas } from 'qrcode.react';
-import AddItem from './additem'; // Import AddItem for editing
+import AddItem from './additem'; 
 
 const InventoryView = () => {
   const [items, setItems] = useState([]);
@@ -30,14 +30,18 @@ const InventoryView = () => {
     .list-view th { background: #f59e0b; color: #000; padding: 12px; text-align: left; }
     .list-view td { padding: 12px; border-bottom: 1px solid #222; font-size: 14px; }
     
-    .btn-action { padding: 8px 12px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; font-size: 11px; margin: 2px; text-transform: uppercase; }
+    /* 3x Longer Buttons for List View */
+    .btn-action { min-width: 120px; padding: 10px 15px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; font-size: 11px; text-transform: uppercase; transition: 0.3s; }
     .btn-edit { background: #3b82f6; color: #fff; }
     .btn-qr { background: #fff; color: #000; }
     .btn-barcode { background: #10b981; color: #fff; }
     .btn-delete { background: #ef4444; color: #fff; }
+    
+    .button-group-pair { display: flex; gap: 8px; }
+    .pair-separator { margin-right: 25px; } /* Distance between pairs */
 
     .edit-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 2000; overflow-y: auto; padding-top: 20px; }
-    .close-edit { position: fixed; top: 20px; right: 20px; background: #ef4444; color: #fff; border: none; padding: 10px 20px; border-radius: 10px; font-weight: bold; z-index: 2100; cursor: pointer; }
+    .close-edit { position: fixed; top: 20px; right: 20px; background: #ef4444; color: #fff; border: none; padding: 12px 24px; border-radius: 10px; font-weight: bold; z-index: 2100; cursor: pointer; }
   `;
 
   useEffect(() => {
@@ -65,7 +69,6 @@ const InventoryView = () => {
   const handleDelete = async (id) => {
     if(window.confirm("Are you sure you want to delete this item?")) {
       await deleteDoc(doc(db, "inventory_records", id));
-      alert("Item Deleted Successfully");
     }
   };
 
@@ -85,9 +88,9 @@ const InventoryView = () => {
       <style>{styles}</style>
       
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
-        <h2 style={{ color: '#f59e0b', fontStyle: 'italic', fontWeight: '900', fontSize: '24px' }}>INVENTORY HUB</h2>
+        <h2 style={{ color: '#f59e0b', fontStyle: 'italic', fontWeight: '900', fontSize: '24px' }}>FLOWTRACK EXPLORER</h2>
         <button className="view-toggle" onClick={() => setViewType(viewType === 'grid' ? 'list' : 'grid')}>
-          {viewType === 'grid' ? 'LIST VIEW' : 'GRID VIEW'}
+          {viewType === 'grid' ? 'SWITCH TO LIST' : 'SWITCH TO GRID'}
         </button>
       </div>
 
@@ -109,13 +112,16 @@ const InventoryView = () => {
               <h4 style={{margin:'5px 0', fontSize: '18px'}}>{item.name}</h4>
               <p style={{color:'#f59e0b', fontWeight: 'bold'}}>{item.retailPrice} PKR</p>
               
-              <div style={{marginTop:'15px', display: 'flex', flexWrap: 'wrap', justifyContent: 'center'}}>
-                <button className="btn-action btn-edit" onClick={() => setEditingItem(item)}>EDIT</button>
-                <button className="btn-action btn-qr" onClick={() => downloadAsset(`qr-${item.id}`, item.name, 'QR')}>QR</button>
-                <button className="btn-action btn-barcode" onClick={() => downloadAsset(`bar-${item.id}`, item.name, 'BARCODE')}>BAR</button>
-                <button className="btn-action btn-delete" onClick={() => handleDelete(item.id)}>DEL</button>
+              <div style={{marginTop:'15px', display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center'}}>
+                <div className="button-group-pair">
+                  <button className="btn-action btn-qr" onClick={() => downloadAsset(`qr-${item.id}`, item.name, 'QR')}>QR</button>
+                  <button className="btn-action btn-barcode" onClick={() => downloadAsset(`bar-${item.id}`, item.name, 'BARCODE')}>BARCODE</button>
+                </div>
+                <div className="button-group-pair">
+                  <button className="btn-action btn-edit" onClick={() => setEditingItem(item)}>EDIT</button>
+                  <button className="btn-action btn-delete" onClick={() => handleDelete(item.id)}>DELETE</button>
+                </div>
                 
-                {/* Hidden canvases for generation */}
                 <div style={{display:'none'}}>
                   <QRCodeCanvas id={`qr-${item.id}`} value={item.qrCodeData} size={256} />
                   <QRCodeCanvas id={`bar-${item.id}`} value={item.barcodeData} size={256} />
@@ -131,23 +137,31 @@ const InventoryView = () => {
               <tr>
                 <th>Item Name</th>
                 <th>Company</th>
-                <th>Category</th>
                 <th>Price</th>
-                <th>Actions</th>
+                <th>Actions Control</th>
               </tr>
             </thead>
             <tbody>
               {filteredItems.map(item => (
                 <tr key={item.id}>
-                  <td>{item.name}</td>
+                  <td style={{fontWeight:'bold'}}>{item.name}</td>
                   <td>{item.company}</td>
-                  <td>{item.category}</td>
-                  <td>{item.retailPrice}</td>
+                  <td style={{color:'#f59e0b', fontWeight:'bold'}}>{item.retailPrice}</td>
                   <td>
-                    <button className="btn-action btn-edit" onClick={() => setEditingItem(item)}>EDIT</button>
-                    <button className="btn-action btn-qr" onClick={() => downloadAsset(`qr-${item.id}`, item.name, 'QR')}>QR</button>
-                    <button className="btn-action btn-barcode" onClick={() => downloadAsset(`bar-${item.id}`, item.name, 'BAR')}>BAR</button>
-                    <button className="btn-action btn-delete" onClick={() => handleDelete(item.id)}>DEL</button>
+                    <div style={{display:'flex', alignItems:'center'}}>
+                      {/* Pair 1: QR & Barcode */}
+                      <div className="button-group-pair pair-separator">
+                        <button className="btn-action btn-qr" onClick={() => downloadAsset(`qr-${item.id}`, item.name, 'QR')}>QR</button>
+                        <button className="btn-action btn-barcode" onClick={() => downloadAsset(`bar-${item.id}`, item.name, 'BARCODE')}>BARCODE</button>
+                      </div>
+                      
+                      {/* Pair 2: Edit & Delete */}
+                      <div className="button-group-pair">
+                        <button className="btn-action btn-edit" onClick={() => setEditingItem(item)}>EDIT</button>
+                        <button className="btn-action btn-delete" onClick={() => handleDelete(item.id)}>DELETE</button>
+                      </div>
+                    </div>
+
                     <div style={{display:'none'}}>
                       <QRCodeCanvas id={`qr-${item.id}`} value={item.qrCodeData} size={256} />
                       <QRCodeCanvas id={`bar-${item.id}`} value={item.barcodeData} size={256} />
@@ -160,15 +174,14 @@ const InventoryView = () => {
         </div>
       )}
 
-      {/* EDIT OVERLAY - Opens AddItem Component */}
+      {/* EDIT OVERLAY */}
       {editingItem && (
         <div className="edit-overlay">
-          <button className="close-edit" onClick={() => setEditingItem(null)}>CLOSE & CANCEL</button>
+          <button className="close-edit" onClick={() => setEditingItem(null)}>✖ CANCEL EDIT</button>
           <AddItem 
             editData={editingItem} 
             onComplete={() => {
               setEditingItem(null);
-              alert("Update Successful!");
             }} 
           />
         </div>

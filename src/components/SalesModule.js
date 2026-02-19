@@ -25,92 +25,74 @@ const SalesModule = ({ user }) => {
   };
 
   const styles = `
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap');
     
-    .pos-wrapper {
-      background: #000; min-height: 100vh; padding: 20px; padding-top: 80px;
-      font-family: 'Outfit', sans-serif; color: #fff;
-      display: flex; flex-direction: column; gap: 20px;
+    .pos-root { background: #000; min-height: 100vh; padding: 20px; padding-top: 60px; font-family: 'Outfit', sans-serif; }
+    
+    .search-bar { 
+      width: 100%; padding: 18px; background: #0a0a0a; border: 2px solid #222; 
+      border-radius: 20px; color: #fff; font-size: 18px; font-weight: 700; margin-bottom: 25px;
+    }
+    .search-bar:focus { border-color: #D4AF37; outline: none; box-shadow: 0 0 20px rgba(212,175,55,0.1); }
+
+    .items-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; margin-bottom: 120px; }
+    
+    .item-box {
+      background: #0d0d0d; border: 1px solid #1a1a1a; padding: 20px; border-radius: 25px; 
+      text-align: center; transition: 0.3s; cursor: pointer; border-bottom: 4px solid #D4AF37;
+    }
+    .item-box:hover { transform: translateY(-5px); background: #111; }
+    .item-box strong { display: block; font-size: 18px; margin-bottom: 8px; }
+    .item-box span { color: #D4AF37; font-weight: 900; font-size: 16px; }
+
+    .floating-checkout {
+      position: fixed; bottom: 20px; left: 20px; right: 20px;
+      background: rgba(10, 10, 10, 0.9); backdrop-filter: blur(20px);
+      border: 1px solid rgba(212,175,55,0.3); border-radius: 30px;
+      padding: 20px; display: flex; justify-content: space-between; align-items: center;
+      box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
     }
 
-    .stylish-input {
-      width: 100%; padding: 20px; background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(212,175,55,0.3); border-radius: 20px;
-      color: #fff; font-size: 18px; font-weight: 600; outline: none; transition: 0.3s;
-    }
-    .stylish-input:focus { border-color: #D4AF37; box-shadow: 0 0 20px rgba(212, 175, 55, 0.2); }
-
-    .item-grid-stylish {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px;
+    .btn-pay {
+      background: #D4AF37; color: #000; padding: 15px 30px; border-radius: 18px;
+      font-weight: 900; border: none; font-size: 18px; cursor: pointer;
     }
 
-    .product-box {
-      background: linear-gradient(145deg, #111, #050505);
-      padding: 20px; border-radius: 25px; border: 1px solid #222;
-      text-align: center; transition: 0.3s; cursor: pointer;
-    }
-    .product-box:hover { border-color: #D4AF37; transform: translateY(-5px); }
-    .product-box strong { font-size: 18px; display: block; margin-bottom: 5px; }
-    .product-box span { color: #D4AF37; font-weight: 900; }
-
-    .checkout-glass {
-      background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(20px);
-      border-radius: 40px 40px 0 0; padding: 30px;
-      border: 1px solid rgba(212, 175, 55, 0.2);
-      position: sticky; bottom: 0; margin: 0 -20px;
-    }
-
-    .btn-checkout {
-      width: 100%; padding: 20px; background: linear-gradient(45deg, #D4AF37, #f9e2af);
-      color: #000; border: none; border-radius: 20px; font-size: 20px; font-weight: 900;
-      cursor: pointer; box-shadow: 0 10px 30px rgba(212, 175, 55, 0.3);
-    }
-
-    @media (min-width: 900px) {
-      .pos-wrapper { flex-direction: row; align-items: flex-start; }
-      .checkout-glass { position: sticky; top: 100px; width: 400px; border-radius: 40px; margin: 0; }
+    @media (max-width: 600px) {
+      .floating-checkout { flex-direction: column; gap: 15px; text-align: center; }
+      .btn-pay { width: 100%; }
     }
   `;
 
   const total = cart.reduce((acc, c) => acc + (c.salePrice * c.quantity), 0);
 
   return (
-    <div className="pos-wrapper">
+    <div className="pos-root">
       <style>{styles}</style>
       
-      <div style={{flex: 1}}>
-        <h2 className="gold-gradient-text" style={{fontSize: '30px', marginBottom: '20px'}}>SELECT ITEMS</h2>
-        <input className="stylish-input" placeholder="Search product name..." onChange={e => setSearchTerm(e.target.value)} style={{marginBottom: '20px'}} />
-        
-        <div className="item-grid-stylish">
-          {items.filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
-            <div key={item.id} className="product-box" onClick={() => addToCart(item)}>
-              <strong>{item.name}</strong>
-              <span>Rs. {item.retailPrice}</span>
-            </div>
-          ))}
-        </div>
+      <h2 style={{color: '#D4AF37', fontWeight: 900, fontSize: '30px'}}>SALES TERMINAL</h2>
+      <input className="search-bar" placeholder="🔍 Search Product Name..." onChange={e => setSearchTerm(e.target.value)} />
+      
+      <div className="items-container">
+        {items.filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
+          <div key={item.id} className="item-box" onClick={() => addToCart(item)}>
+            <strong>{item.name}</strong>
+            <span>Rs. {item.retailPrice}</span>
+            <div style={{fontSize:'10px', color:'#444', marginTop:'5px'}}>STOCK: {item.totalPcs}</div>
+          </div>
+        ))}
       </div>
 
-      <div className="checkout-glass">
-        <h2 className="gold-gradient-text" style={{marginTop: 0}}>CHECKOUT</h2>
-        <input className="stylish-input" placeholder="Customer Name" value={customerName} onChange={e => setCustomerName(e.target.value)} style={{marginBottom: '20px'}} />
-        
-        <div style={{maxHeight: '150px', overflowY: 'auto', marginBottom: '20px'}}>
-          {cart.map((c, i) => (
-            <div key={i} style={{display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #222'}}>
-              <span style={{fontSize: '18px', fontWeight: 600}}>{c.name} x{c.quantity}</span>
-              <span style={{fontWeight: 900}}>Rs. {c.quantity * c.salePrice}</span>
-            </div>
-          ))}
+      <div className="floating-checkout">
+        <div>
+          <input 
+            style={{background: 'transparent', border:'none', borderBottom:'1px solid #333', color:'#fff', padding:'5px', marginBottom:'5px', fontSize:'16px', outline:'none'}} 
+            placeholder="Customer Name..."
+            onChange={e => setCustomerName(e.target.value)}
+          />
+          <div style={{color: '#888', fontSize:'12px'}}>TOTAL PAYABLE: <span style={{color:'#D4AF37', fontWeight:900, fontSize:'20px'}}>Rs. {total.toLocaleString()}</span></div>
         </div>
-
-        <div style={{textAlign: 'center', marginBottom: '20px'}}>
-          <span style={{color: '#888', fontSize: '14px'}}>TOTAL PAYABLE</span>
-          <div style={{fontSize: '40px', fontWeight: 900, color: '#D4AF37'}}>Rs. {total.toLocaleString()}</div>
-        </div>
-
-        <button className="btn-checkout">FINALIZE & PRINT</button>
+        <button className="btn-pay" onClick={() => alert("Printing Bill...")}>FINALIZE & PRINT</button>
       </div>
     </div>
   );

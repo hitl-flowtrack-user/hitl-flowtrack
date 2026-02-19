@@ -220,8 +220,8 @@ const AddItem = ({ editData, onComplete }) => {
           <h3 style={{ fontStyle: 'italic', margin: '15px 0' }}>{formData.name || "PRODUCT NAME"}</h3>
           <div className="preview-data-box" style={{border:'2px solid #fff'}}>
             <label className="label-text" style={{color: '#f59e0b'}}>Barcode Data</label>
-            <div style={{fontSize:'10px', wordBreak: 'break-all'}}>{formData.barcodeData}</div>
-          </div>
+            <div style={{fontSize:'10px', color:'#888', wordBreak: 'break-all'}}>{formData.barcodeData}</div>
+          </div></br>
           <div className="preview-data-box" style={{border:'2px solid #fff'}}>
             <label className="label-text" style={{color: '#f59e0b'}}>QR Data</label>
             <div style={{fontSize:'10px', color:'#888', wordBreak: 'break-all'}}>{formData.qrCodeData}</div>
@@ -239,4 +239,5 @@ const AddItem = ({ editData, onComplete }) => {
 };
 
 export default AddItem;
+
 

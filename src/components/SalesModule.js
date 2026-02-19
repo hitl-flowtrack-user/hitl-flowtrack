@@ -11,22 +11,18 @@ const SalesModule = () => {
   const [charges, setCharges] = useState({ discount: 0, labour: 0, freight: 0 });
   const [isProcessing, setIsProcessing] = useState(false);
   const [history, setHistory] = useState([]);
-
-  // Auto-generated Invoice Number (State to hold it before saving)
   const [nextInvoiceNo, setNextInvoiceNo] = useState('');
+  
+  // New States for Printing
+  const [printSize, setPrintSize] = useState('A5'); 
+  const [activePrintBill, setActivePrintBill] = useState(null); // For Re-printing
 
   useEffect(() => {
-    // Generate Initial Invoice ID
     setNextInvoiceNo(`INV-${Date.now().toString().slice(-6)}`);
-
-    // Load Inventory
     const unsubInv = onSnapshot(collection(db, "inventory_records"), (s) => 
       setItems(s.docs.map(d => ({id: d.id, ...d.data()}))));
-    
-    // Load History (Last 10)
-    const q = query(collection(db, "sales_records"), orderBy("createdAt", "desc"), limit(10));
+    const q = query(collection(db, "sales_records"), orderBy("createdAt", "desc"), limit(15));
     const unsubHist = onSnapshot(q, (s) => setHistory(s.docs.map(d => ({id: d.id, ...d.data()}))));
-
     return () => { unsubInv(); unsubHist(); };
   }, []);
 
@@ -44,183 +40,194 @@ const SalesModule = () => {
     setIsProcessing(true);
     
     const now = new Date();
-    const finalInvoiceNo = nextInvoiceNo; // Use the pre-generated ID
-
-    const saleData = {
-      invoiceNo: finalInvoiceNo,
+    const currentData = {
+      invoiceNo: nextInvoiceNo,
       customerName: customer || "Walking Customer",
       processedBy: userName,
       cart: [...cart], 
       subTotal,
       ...charges,
       totalAmount: grandTotal,
-      createdAt: serverTimestamp(),
       dateString: now.toLocaleDateString(),
       timeString: now.toLocaleTimeString()
     };
 
     try {
-      // 1. Database mein save karein
-      await addDoc(collection(db, "sales_records"), saleData);
+      await addDoc(collection(db, "sales_records"), { ...currentData, createdAt: serverTimestamp() });
+      setActivePrintBill(currentData); // Set this as the bill to print
       
-      // 2. Print trigger karein (Bina state clear kiye taake data nazar aaye)
       setTimeout(() => {
         window.print();
-        
-        // 3. Print dialog khulne ke BAAD reset karein
         setCart([]);
         setCustomer('');
         setCharges({ discount: 0, labour: 0, freight: 0 });
-        setNextInvoiceNo(`INV-${Date.now().toString().slice(-6)}`); // New ID for next sale
+        setNextInvoiceNo(`INV-${Date.now().toString().slice(-6)}`);
         setIsProcessing(false);
-      }, 1000);
-
+        setActivePrintBill(null);
+      }, 700);
     } catch(e) { 
-      alert("Error saving sale: " + e.message);
+      alert("Error: " + e.message);
       setIsProcessing(false);
     }
   };
 
-  const styles = `
-    .pos-container { background: #000; min-height: 100vh; display: grid; grid-template-columns: 1fr 420px; gap: 20px; padding: 20px; font-family: 'Segoe UI', Arial; color: #fff; }
-    .main-card { background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 15px; padding: 20px; display: flex; flex-direction: column; }
-    .gold-text { color: #D4AF37; }
-    .input-style { width: 100%; padding: 12px; background: #000; border: 1px solid #333; border-radius: 8px; color: #fff; margin-bottom: 10px; box-sizing: border-box; }
-    .input-style:focus { border-color: #D4AF37; outline: none; }
-    
-    .history-list { flex-grow: 1; overflow-y: auto; margin-top: 15px; border-top: 1px solid #222; padding-top: 10px; }
-    .history-item { background: #111; padding: 10px; border-radius: 10px; margin-bottom: 8px; border-left: 4px solid #D4AF37; display: flex; justify-content: space-between; }
+  // Re-print from History
+  const rePrint = (bill) => {
+    setActivePrintBill(bill);
+    setTimeout(() => {
+      window.print();
+      setActivePrintBill(null);
+    }, 500);
+  };
 
+  const styles = `
+    .pos-wrapper { background: #000; min-height: 100vh; display: grid; grid-template-columns: 1fr 420px; gap: 20px; padding: 20px; font-family: Arial; color: #fff; }
+    .panel { background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 15px; padding: 20px; display: flex; flex-direction: column; }
+    .gold { color: #D4AF37; }
+    .input-ui { width: 100%; padding: 12px; background: #000; border: 1px solid #333; border-radius: 8px; color: #fff; margin-bottom: 10px; box-sizing: border-box; }
+    
+    .hist-scroll { flex-grow: 1; overflow-y: auto; margin-top: 15px; border-top: 1px solid #222; padding-top: 10px; }
+    .hist-card { background: #111; padding: 10px; border-radius: 10px; margin-bottom: 8px; cursor: pointer; border-left: 4px solid #D4AF37; display: flex; justify-content: space-between; transition: 0.3s; }
+    .hist-card:hover { background: #1a1a1a; transform: scale(1.02); }
+
+    /* PRINT LAYOUTS */
     @media print {
-      body * { visibility: hidden !important; }
-      #thermal-print-area, #thermal-print-area * { visibility: visible !important; }
-      #thermal-print-area { position: absolute; left: 0; top: 0; width: 80mm !important; display: block !important; color: #000 !important; background: #fff !important; padding: 10px; }
-      .no-print { display: none !important; }
+      .pos-wrapper, .no-print { display: none !important; }
+      #print-area { display: block !important; background: #fff !important; color: #000 !important; margin: 0 auto; padding: 20px; }
+      .A4 { width: 210mm; min-height: 297mm; }
+      .A5 { width: 148mm; min-height: 210mm; }
     }
-    #thermal-print-area { display: none; }
+    #print-area { display: none; }
   `;
 
   return (
-    <div className="pos-container">
+    <div className="pos-wrapper">
       <style>{styles}</style>
 
-      {/* LEFT: Products */}
-      <div className="main-card">
+      {/* LEFT SIDE */}
+      <div className="panel">
         <div style={{display:'flex', justifyContent:'space-between', marginBottom:'15px'}}>
-          <h2 className="gold-text" style={{margin:0}}>SALES TERMINAL</h2>
-          <div style={{fontSize:'12px'}}>
-            <span style={{color:'#555'}}>USER: </span>
-            <input value={userName} onChange={(e)=>setUserName(e.target.value)} style={{background:'none', border:'none', color:'#D4AF37', fontWeight:'bold', width:'100px', cursor:'pointer'}} />
-          </div>
+          <h2 className="gold">SALE TERMINAL</h2>
+          <input value={userName} onChange={(e)=>setUserName(e.target.value)} style={{background:'none', border:'none', color:'#D4AF37', fontWeight:'bold', textAlign:'right'}} />
         </div>
 
-        <div style={{marginBottom:'15px', display:'flex', gap:'10px'}}>
-           <div style={{flex:1}}><input className="input-style" placeholder="Search Items..." onChange={e => setSearchTerm(e.target.value)} /></div>
-           <div style={{padding:'10px', background:'#111', borderRadius:'8px', border:'1px solid #333', fontSize:'12px'}}>
-             ID: <span className="gold-text">{nextInvoiceNo}</span>
-           </div>
+        <div style={{display:'flex', gap:'10px', marginBottom:'15px'}}>
+          <input className="input-ui" style={{flex:2}} placeholder="Search Products..." onChange={e => setSearchTerm(e.target.value)} />
+          <select className="input-ui" style={{flex:1, color:'#D4AF37'}} onChange={(e) => setPrintSize(e.target.value)}>
+            <option value="A5">A5 Size</option>
+            <option value="A4">A4 Size</option>
+          </select>
         </div>
 
-        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(130px, 1fr))', gap:'10px', overflowY:'auto'}}>
+        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(120px, 1fr))', gap:'10px', overflowY:'auto'}}>
           {items.filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
-            <div key={item.id} style={{background:'#111', padding:'15px', borderRadius:'12px', cursor:'pointer', border:'1px solid #222', textAlign:'center'}} onClick={() => addToCart(item)}>
-              <div style={{fontWeight:'bold', fontSize:'14px'}}>{item.name}</div>
-              <div className="gold-text">Rs. {item.retailPrice}</div>
+            <div key={item.id} style={{background:'#111', padding:'15px', borderRadius:'10px', cursor:'pointer', border:'1px solid #222', textAlign:'center'}} onClick={() => addToCart(item)}>
+              <div style={{fontWeight:'bold'}}>{item.name}</div>
+              <div className="gold">Rs. {item.retailPrice}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* RIGHT: Billing & History */}
-      <div className="main-card" style={{borderColor: '#D4AF37', height: 'calc(100vh - 40px)'}}>
-        <h3 className="gold-text" style={{marginTop:0}}>CHECKOUT</h3>
+      {/* RIGHT SIDE */}
+      <div className="panel" style={{borderColor: '#D4AF37', height: 'calc(100vh - 40px)'}}>
+        <h3 className="gold" style={{marginTop:0}}>BILL DETAILS</h3>
+        <input className="input-ui" placeholder="Customer Name" value={customer} onChange={e => setCustomer(e.target.value)} />
         
-        <input className="input-style" placeholder="Customer Name" value={customer} onChange={e => setCustomer(e.target.value)} />
-        
-        {/* Cart List */}
-        <div style={{height:'180px', overflowY:'auto', background:'#000', borderRadius:'10px', padding:'10px', marginBottom:'15px', border:'1px solid #111'}}>
+        <div style={{height:'150px', overflowY:'auto', background:'#000', padding:'10px', borderRadius:'8px', marginBottom:'10px'}}>
           {cart.map((c, i) => (
-            <div key={i} style={{display:'flex', justifyContent:'space-between', padding:'6px 0', borderBottom:'1px solid #111', fontSize:'13px'}}>
+            <div key={i} style={{display:'flex', justifyContent:'space-between', fontSize:'13px', padding:'4px 0', borderBottom:'1px solid #111'}}>
               <span>{c.name} x{c.qty}</span>
-              <span className="gold-text">{c.qty * c.retailPrice}</span>
+              <span className="gold">{c.qty * c.retailPrice}</span>
             </div>
           ))}
         </div>
 
-        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'8px', marginBottom:'15px'}}>
-           <div><small style={{color:'#444'}}>Labour</small><input type="number" className="input-style" value={charges.labour} onChange={e => setCharges({...charges, labour: e.target.value})} /></div>
-           <div><small style={{color:'#444'}}>Freight</small><input type="number" className="input-style" value={charges.freight} onChange={e => setCharges({...charges, freight: e.target.value})} /></div>
-           <div><small style={{color:'#444'}}>Discount</small><input type="number" className="input-style" value={charges.discount} onChange={e => setCharges({...charges, discount: e.target.value})} /></div>
+        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'5px'}}>
+           <input type="number" className="input-ui" placeholder="Lab" value={charges.labour} onChange={e => setCharges({...charges, labour: e.target.value})} />
+           <input type="number" className="input-ui" placeholder="Frt" value={charges.freight} onChange={e => setCharges({...charges, freight: e.target.value})} />
+           <input type="number" className="input-ui" placeholder="Disc" value={charges.discount} onChange={e => setCharges({...charges, discount: e.target.value})} />
         </div>
 
-        <div style={{background:'#D4AF37', color:'#000', padding:'15px', borderRadius:'12px', textAlign:'center', marginBottom:'15px'}}>
-          <small style={{fontWeight:'bold'}}>NET PAYABLE</small>
-          <div style={{fontSize:'30px', fontWeight:'900'}}>Rs. {grandTotal.toLocaleString()}</div>
+        <div style={{background:'#D4AF37', color:'#000', padding:'15px', borderRadius:'10px', textAlign:'center', fontWeight:'bold', fontSize:'24px'}}>
+          Rs. {grandTotal.toLocaleString()}
         </div>
 
-        <button onClick={handleSaveAndPrint} disabled={isProcessing} style={{width:'100%', padding:'18px', background:'#3fb950', border:'none', borderRadius:'12px', color:'#fff', fontWeight:'bold', cursor:'pointer'}}>
-          {isProcessing ? "SAVING..." : "SAVE & PRINT INVOICE"}
+        <button onClick={handleSaveAndPrint} disabled={isProcessing} style={{width:'100%', padding:'15px', background:'#3fb950', border:'none', borderRadius:'10px', color:'#fff', fontWeight:'bold', marginTop:'10px', cursor:'pointer'}}>
+          {isProcessing ? "SAVING..." : `SAVE & PRINT (${printSize})`}
         </button>
 
-        {/* History (Full Length) */}
-        <div className="history-list">
-          <h4 style={{margin:'0 0 10px 0', fontSize:'12px', color:'#555'}}>RECENT TRANSACTIONS</h4>
+        <div className="hist-scroll">
+          <small style={{color:'#444'}}>CLICK TO RE-PRINT PREVIOUS BILLS</small>
           {history.map((h, idx) => (
-            <div key={idx} className="history-item">
+            <div key={idx} className="hist-card" onClick={() => rePrint(h)}>
               <div style={{fontSize:'12px'}}>
                 <strong>{h.customerName}</strong><br/>
-                <small style={{color:'#444'}}>{h.invoiceNo}</small>
+                <small style={{color:'#555'}}>{h.invoiceNo}</small>
               </div>
-              <div style={{textAlign:'right'}}>
-                <div className="gold-text" style={{fontWeight:'bold'}}>Rs. {h.totalAmount}</div>
-                <div style={{fontSize:'9px', color:'#333'}}>{h.timeString}</div>
+              <div style={{textAlign:'right', fontWeight:'bold'}} className="gold">
+                Rs. {h.totalAmount}<br/>
+                <small style={{fontSize:'9px', color:'#333'}}>{h.timeString}</small>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* --- HIDDEN INVOICE FOR THERMAL PRINT --- */}
-      <div id="thermal-print-area">
-        <div style={{textAlign:'center', borderBottom:'1px dashed #000', paddingBottom:'10px'}}>
-          <h2 style={{margin:0}}>PREMIUM CERAMICS</h2>
-          <p style={{margin:0, fontSize:'10px'}}>Official Sale Receipt</p>
-        </div>
+      {/* --- UNIVERSAL PRINT AREA (A4/A5) --- */}
+      {activePrintBill && (
+        <div id="print-area" className={printSize}>
+          <div style={{textAlign:'center', borderBottom:'2px solid #000', paddingBottom:'10px'}}>
+            <h1 style={{margin:0}}>PREMIUM CERAMICS</h1>
+            <p style={{margin:0}}>Jaranwala Road | 0300-1234567</p>
+          </div>
 
-        <div style={{marginTop:'10px', fontSize:'11px', lineHeight:'1.4'}}>
-          <div><strong>INV NO:</strong> {nextInvoiceNo}</div>
-          <div><strong>DATE:</strong> {new Date().toLocaleDateString()}</div>
-          <div><strong>TIME:</strong> {new Date().toLocaleTimeString()}</div>
-          <div><strong>CUST:</strong> {customer || 'Walking Customer'}</div>
-          <div><strong>CASHIER:</strong> {userName}</div>
-        </div>
+          <div style={{display:'flex', justifyContent:'space-between', marginTop:'20px', borderBottom:'1px solid #eee', paddingBottom:'10px'}}>
+            <div>
+              <strong>INVOICE TO:</strong><br/>
+              {activePrintBill.customerName}<br/>
+              User: {activePrintBill.processedBy}
+            </div>
+            <div style={{textAlign:'right'}}>
+              <strong>INV NO:</strong> {activePrintBill.invoiceNo}<br/>
+              <strong>DATE:</strong> {activePrintBill.dateString}<br/>
+              <strong>TIME:</strong> {activePrintBill.timeString}
+            </div>
+          </div>
 
-        <table style={{width:'100%', marginTop:'10px', fontSize:'11px', borderCollapse:'collapse'}}>
-          <thead style={{borderBottom:'1px solid #000'}}>
-            <tr><th style={{textAlign:'left'}}>Description</th><th style={{textAlign:'right'}}>Total</th></tr>
-          </thead>
-          <tbody>
-            {cart.map((c, i) => (
-              <tr key={i}>
-                <td>{c.name} (x{c.qty})</td>
-                <td style={{textAlign:'right'}}>{c.qty * c.retailPrice}</td>
+          <table style={{width:'100%', marginTop:'20px', borderCollapse:'collapse'}}>
+            <thead>
+              <tr style={{background:'#f5f5f5'}}>
+                <th style={{border:'1px solid #ddd', padding:'10px', textAlign:'left'}}>Description</th>
+                <th style={{border:'1px solid #ddd', padding:'10px', textAlign:'center'}}>Qty</th>
+                <th style={{border:'1px solid #ddd', padding:'10px', textAlign:'right'}}>Total</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {activePrintBill.cart.map((item, i) => (
+                <tr key={i}>
+                  <td style={{border:'1px solid #ddd', padding:'10px'}}>{item.name}</td>
+                  <td style={{border:'1px solid #ddd', padding:'10px', textAlign:'center'}}>{item.qty}</td>
+                  <td style={{border:'1px solid #ddd', padding:'10px', textAlign:'right'}}>{item.qty * item.retailPrice}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
-        <div style={{marginTop:'10px', borderTop:'1px dashed #000', paddingTop:'5px', textAlign:'right', fontSize:'11px'}}>
-          <div>Sub Total: Rs. {subTotal}</div>
-          <div>Service/Frt: Rs. {parseFloat(charges.labour||0) + parseFloat(charges.freight||0)}</div>
-          <div>Discount: Rs. {charges.discount || 0}</div>
-          <div style={{fontSize:'14px', fontWeight:'bold', marginTop:'5px'}}>NET TOTAL: Rs. {grandTotal}</div>
+          <div style={{marginTop:'20px', float:'right', width:'250px'}}>
+            <div style={{display:'flex', justifyContent:'space-between', padding:'5px'}}><span>Sub Total:</span><span>Rs. {activePrintBill.subTotal}</span></div>
+            <div style={{display:'flex', justifyContent:'space-between', padding:'5px'}}><span>Labour/Frt:</span><span>Rs. {parseFloat(activePrintBill.labour||0) + parseFloat(activePrintBill.freight||0)}</span></div>
+            <div style={{display:'flex', justifyContent:'space-between', padding:'5px'}}><span>Discount:</span><span>- Rs. {activePrintBill.discount||0}</span></div>
+            <div style={{display:'flex', justifyContent:'space-between', padding:'10px', background:'#f5f5f5', fontWeight:'bold', fontSize:'18px', marginTop:'5px'}}>
+              <span>NET TOTAL:</span><span>Rs. {activePrintBill.totalAmount}</span>
+            </div>
+          </div>
+          <div style={{clear:'both', marginTop:'100px', textAlign:'center', borderTop:'1px solid #eee', paddingTop:'20px'}}>
+            <p>Printed at: {new Date().toLocaleString()}</p>
+            <p>Thank you for your business!</p>
+          </div>
         </div>
-
-        <div style={{textAlign:'center', marginTop:'25px', fontSize:'10px', borderTop:'1px solid #000', paddingTop:'5px'}}>
-          <p>Print Time: {new Date().toLocaleTimeString()}</p>
-          <strong>THANK YOU FOR SHOPPING!</strong>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

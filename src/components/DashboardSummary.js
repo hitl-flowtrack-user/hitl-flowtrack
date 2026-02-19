@@ -6,6 +6,7 @@ const DashboardSummary = () => {
   const [items, setItems] = useState([]);
   const [sales, setSales] = useState([]);
   const [purchases, setPurchases] = useState([]);
+  const [selectedBill, setSelectedBill] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -16,7 +17,6 @@ const DashboardSummary = () => {
       setSales(snap.docs.map(doc => ({id: doc.id, ...doc.data()})));
       setLoading(false);
     });
-    // Assuming you have a purchase_records collection
     const unsubPurch = onSnapshot(query(collection(db, "purchase_records"), orderBy("createdAt", "desc"), limit(3)), (snap) => {
       setPurchases(snap.docs.map(doc => doc.data()));
     });
@@ -27,112 +27,114 @@ const DashboardSummary = () => {
   const lowStockItems = items.filter(item => (parseFloat(item.totalPcs) || 0) < 10);
 
   const styles = `
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&display=swap');
-    .dash-main { background: #000; min-height: 100vh; font-family: 'Outfit', sans-serif; color: #fff; padding: 20px; padding-top: 60px; }
+    .dash-wrapper { background: #000; min-height: 100vh; padding: 20px; color: #fff; font-family: 'Outfit', sans-serif; }
+    .bento-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 20px; margin-top: 20px; }
+    .card { background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 25px; padding: 25px; position: relative; }
+    .gold-glow { border-color: #D4AF37; box-shadow: 0 0 15px rgba(212, 175, 55, 0.1); }
     
-    .main-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 20px; }
-    
-    .card { background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 24px; padding: 20px; position: relative; transition: 0.3s; }
-    .card:hover { border-color: #D4AF37; box-shadow: 0 0 20px rgba(212,175,55,0.05); }
-
-    .span-4 { grid-column: span 4; }
-    .span-8 { grid-column: span 8; }
-    .span-12 { grid-column: span 12; }
-
-    .gold-text { color: #D4AF37; font-weight: 900; }
-    .label { font-size: 11px; text-transform: uppercase; color: #555; letter-spacing: 1.5px; font-weight: 700; }
-    .big-val { font-size: 32px; font-weight: 900; display: block; margin: 5px 0; }
-
-    .scroll-list { max-height: 300px; overflow-y: auto; margin-top: 15px; }
-    .list-row { 
-      display: flex; justify-content: space-between; align-items: center; 
-      padding: 12px; border-bottom: 1px solid #111; cursor: pointer; border-radius: 12px;
+    .invoice-row { 
+      display: flex; justify-content: space-between; padding: 15px; background: #111; 
+      border-radius: 15px; margin-bottom: 10px; cursor: pointer; border: 1px solid transparent;
     }
-    .list-row:hover { background: #111; }
+    .invoice-row:hover { border-color: #D4AF37; background: #161616; }
 
-    .badge-red { background: rgba(239, 68, 68, 0.1); color: #ef4444; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 700; }
-    .badge-gold { background: rgba(212, 175, 55, 0.1); color: #D4AF37; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 700; }
-
-    @media (max-width: 900px) { .span-4, .span-8 { grid-column: span 12; } }
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .bill-popup { background: #fff; color: #000; width: 350px; padding: 30px; border-radius: 20px; font-family: 'Courier New', monospace; }
   `;
 
   return (
-    <div className="dash-main">
+    <div className="dash-wrapper">
       <style>{styles}</style>
-      <div style={{marginBottom:'30px'}}>
-        <h1 className="gold-text" style={{fontSize:'36px', margin:0}}>COMMAND CENTER</h1>
-        <p style={{color:'#444', fontWeight:600}}>SYSTEM INTELLIGENCE v2.0</p>
-      </div>
+      <h1 style={{color: '#D4AF37', fontWeight: 900}}>COMMAND CENTER</h1>
 
-      <div className="main-grid">
-        {/* Top Stats */}
-        <div className="card span-4">
-          <span className="label">Daily Gross Revenue</span>
-          <span className="big-val gold-text">Rs. {totalRevenue.toLocaleString()}</span>
-          <span style={{fontSize:'12px', color:'#3fb950'}}>+8% From Yesterday</span>
+      <div className="bento-grid">
+        {/* Stats Cards */}
+        <div className="card" style={{gridColumn: 'span 4'}}>
+          <small style={{color:'#666'}}>REVENUE TODAY</small>
+          <h2 style={{fontSize: '32px', margin: '5px 0', color: '#D4AF37'}}>Rs. {totalRevenue.toLocaleString()}</h2>
+        </div>
+        
+        <div className="card" style={{gridColumn: 'span 4'}}>
+          <small style={{color:'#666'}}>LOW STOCK ITEMS</small>
+          <h2 style={{fontSize: '32px', margin: '5px 0', color: '#ef4444'}}>{lowStockItems.length}</h2>
         </div>
 
-        <div className="card span-4">
-          <span className="label">Inventory Health</span>
-          <span className="big-val">{items.length} Products</span>
-          <span className="badge-red">{lowStockItems.length} Low Stock Alerts</span>
+        <div className="card" style={{gridColumn: 'span 4'}}>
+          <small style={{color:'#666'}}>TOTAL INVENTORY</small>
+          <h2 style={{fontSize: '32px', margin: '5px 0'}}>{items.length} SKUs</h2>
         </div>
 
-        <div className="card span-4">
-          <span className="label">Active Sessions</span>
-          <span className="big-val">04 Users</span>
-          <span className="badge-gold">Online Now</span>
-        </div>
-
-        {/* Daily Invoices (Clickable) */}
-        <div className="card span-8">
-          <div style={{display:'flex', justifyContent:'space-between'}}>
-            <h3 className="gold-text" style={{margin:0}}>DAILY INVOICES</h3>
-            <span className="label">Live Feed</span>
-          </div>
-          <div className="scroll-list">
+        {/* Daily Invoices Feed */}
+        <div className="card" style={{gridColumn: 'span 8'}}>
+          <h3 style={{marginTop: 0, color:'#D4AF37'}}>DAILY INVOICES <small style={{fontSize:'10px', color:'#444'}}>(CLICK TO VIEW)</small></h3>
+          <div style={{maxHeight:'400px', overflowY:'auto'}}>
             {sales.map((sale, i) => (
-              <div key={i} className="list-row" onClick={() => alert(`Invoice ID: ${sale.id}\nItems: ${sale.cart?.length || 0}\nAmount: ${sale.totalAmount}`)}>
+              <div key={i} className="invoice-row" onClick={() => setSelectedBill(sale)}>
                 <div>
-                  <div style={{fontWeight:700}}>{sale.customerName || 'Walking Customer'}</div>
-                  <div style={{fontSize:'11px', color:'#444'}}>{new Date().toLocaleTimeString()}</div>
+                  <div style={{fontWeight: 900}}>{sale.customerName}</div>
+                  <div style={{fontSize:'12px', color:'#555'}}>{sale.invoiceNo} | {sale.timeString}</div>
                 </div>
-                <div style={{textAlign:'right'}}>
-                  <div className="gold-text">Rs. {sale.totalAmount}</div>
-                  <div style={{fontSize:'10px', color:'#3fb950'}}>CLICK TO VIEW</div>
+                <div style={{textAlign: 'right'}}>
+                  <div style={{color: '#D4AF37', fontWeight: 900}}>Rs. {sale.totalAmount}</div>
+                  <div style={{fontSize:'10px', color: '#3fb950'}}>PAID</div>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Low Stock Detailed */}
-        <div className="card span-4">
-          <h3 style={{margin:0, color:'#ef4444'}}>CRITICAL STOCK</h3>
-          <div className="scroll-list">
-            {lowStockItems.map((item, i) => (
-              <div key={i} className="list-row">
-                <span style={{fontSize:'14px'}}>{item.name}</span>
-                <span className="badge-red">{item.totalPcs} Pcs</span>
-              </div>
-            ))}
-          </div>
+        {/* Low Stock Sidebar */}
+        <div className="card" style={{gridColumn: 'span 4'}}>
+          <h3 style={{marginTop: 0, color:'#ef4444'}}>CRITICAL STOCK</h3>
+          {lowStockItems.slice(0, 8).map((item, i) => (
+            <div key={i} style={{padding:'10px 0', borderBottom:'1px solid #111', display:'flex', justifyContent:'space-between'}}>
+              <span>{item.name}</span>
+              <span style={{color:'#ef4444', fontWeight:'bold'}}>{item.totalPcs}</span>
+            </div>
+          ))}
         </div>
 
         {/* Last 3 Purchases */}
-        <div className="card span-12">
-          <h3 className="gold-text" style={{margin:0}}>LAST 3 INVENTORY UPDATES (PURCHASES)</h3>
-          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(250px, 1fr))', gap:'15px', marginTop:'15px'}}>
-            {purchases.length > 0 ? purchases.map((p, i) => (
-              <div key={i} style={{background:'#111', padding:'15px', borderRadius:'15px', border:'1px solid #222'}}>
-                <div className="label">{p.supplierName}</div>
-                <div style={{fontWeight:900, fontSize:'18px', margin:'5px 0'}}>Rs. {p.totalBill}</div>
-                <div style={{fontSize:'12px', color:'#666'}}>{p.date}</div>
+        <div className="card" style={{gridColumn: 'span 12'}}>
+          <h3 style={{marginTop: 0, color: '#D4AF37'}}>LAST 3 PURCHASES</h3>
+          <div style={{display:'flex', gap:'20px'}}>
+            {purchases.map((p, i) => (
+              <div key={i} style={{flex:1, background:'#111', padding:'15px', borderRadius:'15px'}}>
+                <div style={{fontSize:'12px', color:'#555'}}>{p.supplierName}</div>
+                <div style={{fontSize:'20px', fontWeight:900, color:'#D4AF37'}}>Rs. {p.totalBill}</div>
+                <div style={{fontSize:'11px'}}>{p.date}</div>
               </div>
-            )) : <div style={{color:'#444'}}>No recent purchases recorded.</div>}
+            ))}
           </div>
         </div>
       </div>
+
+      {/* Bill Preview Modal */}
+      {selectedBill && (
+        <div className="modal-overlay" onClick={() => setSelectedBill(null)}>
+          <div className="bill-popup" onClick={e => e.stopPropagation()}>
+            <div style={{textAlign:'center'}}>
+              <h3>PREMIUM CERAMICS</h3>
+              <p style={{fontSize:'12px'}}>Invoice: {selectedBill.invoiceNo}</p>
+              <hr/>
+            </div>
+            <div style={{minHeight: '100px', fontSize:'14px'}}>
+              {selectedBill.cart.map((item, idx) => (
+                <div key={idx} style={{display:'flex', justifyContent:'space-between'}}>
+                  <span>{item.name} x{item.qty}</span>
+                  <span>{item.qty * item.retailPrice}</span>
+                </div>
+              ))}
+            </div>
+            <hr/>
+            <div style={{fontWeight:'bold', fontSize:'18px', display:'flex', justifyContent:'space-between'}}>
+              <span>TOTAL:</span>
+              <span>Rs. {selectedBill.totalAmount}</span>
+            </div>
+            <button onClick={() => setSelectedBill(null)} style={{width:'100%', marginTop:'20px', padding:'10px', background:'#000', color:'#fff', border:'none', borderRadius:'10px'}}>CLOSE</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

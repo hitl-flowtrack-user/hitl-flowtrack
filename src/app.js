@@ -1,129 +1,119 @@
 import React, { useState } from 'react';
-
-// --- FIXED IMPORTS (Matching your file names exactly) ---
-import InventoryView from './inventoryview'; // Small letters as per your details
-import SalesModule from './salesmodule';     // Small letters as per your details
-import Reports from './Reports';             // Capital as per your details
-import ExpenseTracker from './ExpenseTracker'; // Capital as per your details
-import DashboardSummary from './Dashboard Summary'; // Capital as per your details
-import SalesHistory from './SalesHistory';   // Capital as per your details
+import AddItem from './components/additem';
+import InventoryView from './components/inventoryview';
+import DashboardSummary from './components/DashboardSummary';
+import SalesModule from './components/SalesModule';
+import SalesHistory from './components/SalesHistory';
 
 function App() {
-  // State to manage views
-  const [view, setView] = useState('sales');
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [editData, setEditData] = useState(null);
 
-  // Navigation Button Styling
-  const navBtnStyle = (active) => ({
-    padding: '12px 20px',
-    background: active ? '#D4AF37' : '#111',
-    color: active ? '#000' : '#fff',
-    border: '1px solid #333',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-    fontSize: '13px',
-    marginRight: '8px',
-    transition: 'all 0.3s ease',
-    textTransform: 'uppercase',
-    letterSpacing: '1px'
-  });
+  // Function to handle switching to Edit mode from Inventory
+  const handleEdit = (item) => {
+    setEditData(item);
+    setActiveTab('additem');
+    setSidebarOpen(false);
+  };
+
+  const menuItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+    { id: 'additem', label: 'Add New Item', icon: '➕' },
+    { id: 'inventory', label: 'Stock View', icon: '📦' },
+    { id: 'sales', label: 'New Sale (POS)', icon: '💰' },
+    { id: 'history', label: 'Sales History', icon: '📜' },
+  ];
+
+  const styles = `
+    .app-wrapper { display: flex; background: #000; min-height: 100vh; color: #fff; position: relative; }
+    
+    /* Sidebar Styling */
+    .sidebar { 
+      width: 260px; background: #111; height: 100vh; position: fixed; left: ${isSidebarOpen ? '0' : '-260px'}; 
+      transition: 0.3s; z-index: 1000; border-right: 1px solid #222; padding-top: 60px;
+    }
+    .sidebar-overlay {
+      display: ${isSidebarOpen ? 'block' : 'none'}; position: fixed; top: 0; left: 0; 
+      width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999;
+    }
+    
+    .menu-btn { 
+      position: fixed; top: 15px; left: 15px; z-index: 1001; background: #f59e0b; 
+      border: none; border-radius: 5px; padding: 8px 12px; cursor: pointer; color: #000; font-weight: bold;
+    }
+
+    .nav-item { 
+      padding: 15px 25px; cursor: pointer; display: flex; align-items: center; gap: 15px;
+      transition: 0.2s; font-weight: 500; color: #aaa;
+    }
+    .nav-item:hover { background: #1a1a1a; color: #f59e0b; }
+    .nav-item.active { background: #1a1a1a; color: #f59e0b; border-left: 4px solid #f59e0b; }
+
+    .main-content { 
+      flex: 1; margin-left: 0; transition: 0.3s; width: 100%;
+      padding: 20px; padding-top: 70px; 
+    }
+
+    .logo-area { padding: 0 25px 30px; border-bottom: 1px solid #222; margin-bottom: 20px; }
+    .logo-text { font-style: italic; font-weight: 900; color: #f59e0b; font-size: 20px; }
+  `;
 
   return (
-    <div style={{ 
-      background: '#000', 
-      minHeight: '100vh', 
-      color: '#fff', 
-      fontFamily: "'Segoe UI', Roboto, sans-serif" 
-    }}>
-      
-      {/* --- PREMIUM NAVIGATION --- */}
-      <nav style={{ 
-        padding: '15px 25px', 
-        background: '#0a0a0a', 
-        display: 'flex', 
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        borderBottom: '1px solid #1a1a1a',
-        position: 'sticky',
-        top: 0,
-        zIndex: 1000
-      }}>
-        <h2 style={{ color: '#D4AF37', margin: 0, fontSize: '20px', fontWeight: '900', letterSpacing: '2px' }}>
-          PREMIUM CERAMICS
-        </h2>
+    <div className="app-wrapper">
+      <style>{styles}</style>
 
-        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-          <button style={navBtnStyle(view === 'inventory')} onClick={() => setView('inventory')}>
-            Inventory
-          </button>
-          <button style={navBtnStyle(view === 'sales')} onClick={() => setView('sales')}>
-            Sales Terminal
-          </button>
-          <button style={navBtnStyle(view === 'reports')} onClick={() => setView('reports')}>
-            Reports
-          </button>
-          <button style={navBtnStyle(view === 'expenses')} onClick={() => setView('expenses')}>
-            Expenses
-          </button>
-          <button style={navBtnStyle(view === 'history')} onClick={() => setView('history')}>
-            History
-          </button>
+      {/* Hamburger Button */}
+      <button className="menu-btn" onClick={() => setSidebarOpen(!isSidebarOpen)}>
+        {isSidebarOpen ? '✕ Close' : '☰ Menu'}
+      </button>
+
+      {/* Sidebar Overlay */}
+      <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}></div>
+
+      {/* Sidebar Navigation */}
+      <nav className="sidebar">
+        <div className="logo-area">
+          <div className="logo-text">GEMINI IMS</div>
+          <small style={{color:'#444'}}>v2.0 Beta</small>
         </div>
+        {menuItems.map(item => (
+          <div 
+            key={item.id} 
+            className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab(item.id);
+              setSidebarOpen(false);
+              if(item.id !== 'additem') setEditData(null); // Clear edit data if moving away
+            }}
+          >
+            <span>{item.icon}</span> {item.label}
+          </div>
+        ))}
       </nav>
 
-      {/* --- CONTENT AREA --- */}
-      <div style={{ padding: '25px' }}>
-        <div style={{ maxWidth: '1600px', margin: '0 auto' }}>
-          
-          <div className="view-container">
-            {/* Dashboard Summary hamesha top par dikhayen agar aap chahte hain */}
-            {view === 'sales' && <DashboardSummary />}
-
-            {/* View switching logic */}
-            {view === 'inventory' && <InventoryView />}
-            {view === 'sales' && <SalesModule />}
-            {view === 'reports' && <Reports />}
-            {view === 'expenses' && <ExpenseTracker />}
-            {view === 'history' && <SalesHistory />}
-          </div>
-
-        </div>
-      </div>
-
-      {/* Global CSS for Styling & Animations */}
-      <style>{`
-        body { margin: 0; padding: 0; background: #000; overflow-x: hidden; }
+      {/* Main Module Display */}
+      <main className="main-content">
+        {activeTab === 'dashboard' && <DashboardSummary />}
         
-        .view-container {
-          animation: fadeIn 0.3s ease-in;
-        }
+        {activeTab === 'additem' && (
+          <AddItem 
+            existingItem={editData} 
+            onComplete={() => {
+              setEditData(null);
+              setActiveTab('inventory');
+            }} 
+          />
+        )}
+        
+        {activeTab === 'inventory' && (
+          <InventoryView onEdit={handleEdit} />
+        )}
 
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
-        button:hover {
-          background: #D4AF37 !important;
-          color: #000 !important;
-          transform: translateY(-2px);
-        }
-
-        ::-webkit-scrollbar {
-          width: 6px;
-        }
-        ::-webkit-scrollbar-track {
-          background: #000;
-        }
-        ::-webkit-scrollbar-thumb {
-          background: #333;
-          border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-          background: #D4AF37;
-        }
-      `}</style>
-
+        {activeTab === 'sales' && <SalesModule />}
+        
+        {activeTab === 'history' && <SalesHistory />}
+      </main>
     </div>
   );
 }

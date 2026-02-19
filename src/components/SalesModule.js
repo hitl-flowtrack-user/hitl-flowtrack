@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, onSnapshot, writeBatch, doc, serverTimestamp } from "firebase/firestore";
 
-const SalesModule = ({ user }) => { // User prop contains login ID/Name
+const SalesModule = ({ user }) => {
   const [items, setItems] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState([]);
@@ -16,9 +16,9 @@ const SalesModule = ({ user }) => { // User prop contains login ID/Name
   const [unloading, setUnloading] = useState({ type: 'cash', val: 0 });
   const [extraCharges, setExtraCharges] = useState(0);
   
-  // Payment States
-  const [paymentType, setPaymentType] = useState('cash'); // cash, credit, partial
+  const [paymentType, setPaymentType] = useState('cash'); 
   const [paidAmount, setPaidAmount] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "inventory_records"), (snapshot) => {
@@ -30,59 +30,84 @@ const SalesModule = ({ user }) => { // User prop contains login ID/Name
   const addToCart = (item) => {
     const existing = cart.find(c => c.id === item.id);
     if (existing) {
-      updateCartQty(item.id, existing.quantity + 1);
+      setCart(cart.map(c => c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c));
     } else {
       setCart([...cart, { ...item, quantity: 1, salePrice: item.retailPrice }]);
     }
   };
 
-  const updateCartQty = (id, newQty) => {
-    setCart(cart.map(c => c.id === id ? { ...c, quantity: parseInt(newQty) || 0 } : c));
-  };
-
-  // Calculation Logic
-  const getSubTotal = () => cart.reduce((acc, c) => acc + (c.salePrice * c.quantity), 0);
-  
   const calculateFinal = () => {
-    const sub = getSubTotal();
-    const getVal = (obj) => obj.type === 'percent' ? (sub * (obj.val / 100)) : parseFloat(obj.val || 0);
+    const sub = cart.reduce((acc, c) => acc + (c.salePrice * c.quantity), 0);
+    const getVal = (obj) => obj.type === 'percent' ? (sub * (parseFloat(obj.val || 0) / 100)) : parseFloat(obj.val || 0);
     
-    const discVal = getVal(discount);
-    const rentVal = getVal(rent);
-    const loadVal = getVal(loading);
-    const unloadVal = getVal(unloading);
-    
-    return sub - discVal + rentVal + loadVal + unloadVal + parseFloat(extraCharges || 0);
+    return sub - getVal(discount) + getVal(rent) + getVal(loading) + getVal(unloading) + parseFloat(extraCharges || 0);
   };
 
-  const finalAmount = calculateFinal();
+  const printInvoice = (saleData) => {
+    const printWindow = window.open('', '_blank');
+    const invoiceHTML = `
+      <html>
+        <head>
+          <style>
+            body { font-family: 'Courier New', monospace; padding: 20px; font-size: 12px; line-height:1.2; }
+            .text-center { text-align: center; }
+            .border-top { border-top: 1px dashed #000; margin-top: 10px; padding-top: 5px; }
+            table { width: 100%; margin-top: 10px; border-collapse: collapse; }
+            th { text-align: left; border-bottom: 1px solid #000; }
+            .flex { display: flex; justify-content: space-between; }
+          </style>
+        </head>
+        <body>
+          <div class="text-center">
+            <h3>GEMINI INVENTORY SYSTEM</h3>
+            <p>Sales Receipt</p>
+          </div>
+          <div class="border-top">
+            <p>Date: ${new Date().toLocaleString()}<br>
+            Customer: ${saleData.customerName}<br>
+            Salesman: ${saleData.salesman}</p>
+          </div>
+          <table>
+            <thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
+            <tbody>
+              ${saleData.items.map(i => `<tr><td>${i.name}</td><td>${i.quantity}</td><td>${i.salePrice}</td><td>${i.quantity * i.salePrice}</td></tr>`).join('')}
+            </tbody>
+          </table>
+          <div class="border-top">
+            <div class="flex"><span>Sub-Total:</span> <span>Rs. ${saleData.subTotal}</span></div>
+            <div class="flex"><span>Adjustment (Charges/Disc):</span> <span>Rs. ${saleData.totalAmount - saleData.subTotal}</span></div>
+            <div class="flex" style="font-weight:bold; font-size:14px;"><span>GRAND TOTAL:</span> <span>Rs. ${saleData.totalAmount}</span></div>
+          </div>
+          <div class="border-top text-center"><p>Thank You For Your Business!</p></div>
+        </body>
+      </html>
+    `;
+    printWindow.document.write(invoiceHTML);
+    printWindow.document.close();
+    printWindow.print();
+  };
 
   const handleSale = async () => {
-    if (!customerName || cart.length === 0) return alert("Details missing!");
-    setLoading(true);
+    if (!customerName || cart.length === 0) return alert("Customer or Items missing!");
+    setIsProcessing(true);
     const batch = writeBatch(db);
+    const finalAmount = calculateFinal();
 
     try {
       const saleRef = doc(collection(db, "sales_records"));
       const saleData = {
         customerName,
         salesman: user?.name || "Admin",
-        salesmanId: user?.uid || "admin01",
         items: cart,
-        subTotal: getSubTotal(),
-        discounts: discount,
-        charges: { rent, loading, unloading, extra: extraCharges },
+        subTotal: cart.reduce((acc, c) => acc + (c.salePrice * c.quantity), 0),
         totalAmount: finalAmount,
         paymentStatus: paymentType,
-        paidAmount: paymentType === 'cash' ? finalAmount : (paymentType === 'credit' ? 0 : paidAmount),
-        balance: paymentType === 'credit' ? finalAmount : (paymentType === 'partial' ? finalAmount - paidAmount : 0),
-        warehouse: selectedWarehouse,
+        paidAmount: paymentType === 'cash' ? finalAmount : (paymentType === 'partial' ? parseFloat(paidAmount) : 0),
         createdAt: serverTimestamp(),
       };
 
       batch.set(saleRef, saleData);
 
-      // Inventory Minus
       cart.forEach(product => {
         const itemRef = doc(db, "inventory_records", product.id);
         const newStockPcs = (parseFloat(product.totalPcs) || 0) - product.quantity;
@@ -93,114 +118,115 @@ const SalesModule = ({ user }) => { // User prop contains login ID/Name
       });
 
       await batch.commit();
-      alert("Sale Recorded Successfully!");
+      printInvoice(saleData);
       setCart([]); setCustomerName('');
+      alert("Sale Finalized & Printed!");
     } catch (err) { alert(err.message); }
-    setLoading(false);
+    setIsProcessing(false);
   };
 
-  const filteredItems = items.filter(item => 
-    (selectedWarehouse === 'All' || item.warehouse === selectedWarehouse) &&
-    (item.name?.toLowerCase().includes(searchTerm.toLowerCase()) || item.sku?.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-
   const styles = `
-    .pos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; background: #000; color: #fff; padding: 10px; }
-    .item-box { background: #111; padding: 15px; border-radius: 12px; height: 85vh; overflow-y: auto; border: 1px solid #222; }
-    .bill-box { background: #111; padding: 15px; border-radius: 12px; border-top: 4px solid #f59e0b; }
-    .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-    .calc-field { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-top: 5px; border: 1px solid #333; }
-    .calc-field select, .calc-field input { background: transparent; color: #fff; border: none; outline: none; width: 45%; }
-    .total-banner { background: #f59e0b; color: #000; padding: 15px; border-radius: 10px; text-align: center; font-size: 24px; font-weight: 900; margin-top: 15px; }
-    .search-bar { width: 100%; padding: 10px; border-radius: 8px; background: #222; border: 1px solid #444; color: #fff; margin-bottom: 10px; }
+    .pos-container { display: flex; gap: 20px; padding: 20px; background: #000; min-height: 90vh; font-family: 'Inter', sans-serif; }
+    .product-panel { flex: 1.5; background: #111; border-radius: 15px; padding: 20px; border: 1px solid #222; }
+    .billing-panel { flex: 1; background: #111; border-radius: 15px; padding: 20px; border: 1px solid #222; border-top: 4px solid #f59e0b; display: flex; flex-direction: column; }
+    
+    .search-row { display: flex; gap: 10px; margin-bottom: 20px; }
+    .pos-input { background: #222; border: 1px solid #333; color: #fff; padding: 12px; border-radius: 8px; width: 100%; outline: none; }
+    .pos-input:focus { border-color: #f59e0b; }
+
+    .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; overflow-y: auto; max-height: 70vh; }
+    .product-card { background: #1a1a1a; padding: 15px; border-radius: 12px; cursor: pointer; border: 1px solid #222; transition: 0.2s; }
+    .product-card:hover { border-color: #f59e0b; background: #222; }
+
+    .cart-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 13px; }
+    .cart-table th { text-align: left; color: #888; padding-bottom: 10px; border-bottom: 1px solid #222; }
+    .cart-table td { padding: 10px 0; border-bottom: 1px solid #1a1a1a; }
+
+    .calc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: auto; }
+    .mini-field { background: #1a1a1a; padding: 8px; border-radius: 6px; border: 1px solid #333; }
+    .mini-field label { font-size: 10px; color: #f59e0b; display: block; text-transform: uppercase; }
+    .mini-field select, .mini-field input { background: transparent; border: none; color: #fff; width: 45%; outline: none; font-size: 12px; }
+
+    .grand-total { background: #f59e0b; color: #000; padding: 15px; border-radius: 10px; margin-top: 15px; text-align: center; }
+    .btn-save { background: #10b981; color: #000; border: none; padding: 15px; border-radius: 10px; font-weight: 900; cursor: pointer; margin-top: 10px; width: 100%; }
   `;
 
+  const filteredItems = items.filter(i => 
+    (selectedWarehouse === 'All' || i.warehouse === selectedWarehouse) &&
+    (i.name?.toLowerCase().includes(searchTerm.toLowerCase()) || i.sku?.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
   return (
-    <div className="pos-grid">
+    <div className="pos-container">
       <style>{styles}</style>
       
-      {/* Search & Warehouse Selection */}
-      <div className="item-box">
-        <div className="input-row">
-          <input type="text" className="search-bar" placeholder="Search Product..." onChange={e => setSearchTerm(e.target.value)} />
-          <select className="search-bar" onChange={e => setSelectedWarehouse(e.target.value)}>
+      {/* Left: Product Section */}
+      <div className="product-panel">
+        <div className="search-row">
+          <input className="pos-input" placeholder="Search Item or SKU..." onChange={e => setSearchTerm(e.target.value)} />
+          <select className="pos-input" style={{width: '200px'}} onChange={e => setSelectedWarehouse(e.target.value)}>
             <option value="All">All Warehouses</option>
             {[...new Set(items.map(i => i.warehouse))].map(wh => <option key={wh} value={wh}>{wh}</option>)}
           </select>
         </div>
-        
-        {filteredItems.map(item => (
-          <div key={item.id} className="calc-field" style={{cursor:'pointer'}} onClick={() => addToCart(item)}>
-            <div style={{fontWeight:'bold'}}>{item.name} <small style={{color:'#f59e0b'}}>({item.warehouse})</small></div>
-            <div style={{fontSize:'12px', color:'#888'}}>Stock: {item.totalPcs} | Rs. {item.retailPrice}</div>
-          </div>
-        ))}
+
+        <div className="product-grid">
+          {filteredItems.map(item => (
+            <div key={item.id} className="product-card" onClick={() => addToCart(item)}>
+              <div style={{fontWeight:'bold', fontSize:'14px'}}>{item.name}</div>
+              <div style={{fontSize:'12px', color:'#f59e0b', marginTop:'5px'}}>Rs. {item.retailPrice}</div>
+              <div style={{fontSize:'11px', color:'#555'}}>WH: {item.warehouse} | Stock: {item.totalPcs}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Advanced Billing */}
-      <div className="bill-box">
-        <input type="text" className="search-bar" placeholder="Customer Name" value={customerName} onChange={e => setCustomerName(e.target.value)} />
+      {/* Right: Billing Section */}
+      <div className="billing-panel">
+        <h3 style={{margin:'0 0 15px 0', color:'#f59e0b'}}>CHECKOUT</h3>
+        <input className="pos-input" placeholder="Customer Name" value={customerName} onChange={e => setCustomerName(e.target.value)} style={{marginBottom:'15px'}} />
         
-        <div style={{maxHeight:'200px', overflowY:'auto', borderBottom:'1px solid #222', marginBottom:'10px'}}>
-          <table width="100%" style={{fontSize:'13px'}}>
-            <thead><tr style={{color:'#f59e0b'}}><th>Item</th><th>Qty</th><th>Total</th></tr></thead>
+        <div style={{overflowY:'auto', flex: 1}}>
+          <table className="cart-table">
+            <thead><tr><th>Item</th><th>Qty</th><th>Total</th></tr></thead>
             <tbody>
               {cart.map(c => (
-                <tr key={c.id}><td>{c.name}</td><td>{c.quantity}</td><td>{c.quantity * c.salePrice}</td></tr>
+                <tr key={c.id}>
+                  <td>{c.name}</td>
+                  <td>{c.quantity}</td>
+                  <td>{c.quantity * c.salePrice}</td>
+                </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        {/* Adjustments */}
-        <div className="input-row">
-          <div className="calc-field">
-            <span style={{fontSize:'10px'}}>DISCOUNT</span><br/>
-            <select onChange={e => setDiscount({...discount, type: e.target.value})}><option value="cash">Rs</option><option value="percent">%</option></select>
-            <input type="number" placeholder="0" onChange={e => setDiscount({...discount, val: e.target.value})} />
+        <div className="calc-grid">
+          <div className="mini-field"><label>Discount</label>
+            <select onChange={e => setDiscount({...discount, type:e.target.value})}><option value="cash">Rs</option><option value="percent">%</option></select>
+            <input type="number" onChange={e => setDiscount({...discount, val:e.target.value})} />
           </div>
-          <div className="calc-field">
-            <span style={{fontSize:'10px'}}>RENT / FREIGHT</span><br/>
-            <select onChange={e => setRent({...rent, type: e.target.value})}><option value="cash">Rs</option><option value="percent">%</option></select>
-            <input type="number" placeholder="0" onChange={e => setRent({...rent, val: e.target.value})} />
+          <div className="mini-field"><label>Rent</label>
+            <select onChange={e => setRent({...rent, type:e.target.value})}><option value="cash">Rs</option><option value="percent">%</option></select>
+            <input type="number" onChange={e => setRent({...rent, val:e.target.value})} />
           </div>
-        </div>
-
-        <div className="input-row">
-          <div className="calc-field">
-            <span style={{fontSize:'10px'}}>LOADING</span><br/>
-            <select onChange={e => setLoading({...loading, type: e.target.value})}><option value="cash">Rs</option><option value="percent">%</option></select>
-            <input type="number" placeholder="0" onChange={e => setLoading({...loading, val: e.target.value})} />
+          <div className="mini-field"><label>Loading</label>
+            <select onChange={e => setLoading({...loading, type:e.target.value})}><option value="cash">Rs</option><option value="percent">%</option></select>
+            <input type="number" onChange={e => setLoading({...loading, val:e.target.value})} />
           </div>
-          <div className="calc-field">
-            <span style={{fontSize:'10px'}}>UNLOADING</span><br/>
-            <select onChange={e => setUnloading({...unloading, type: e.target.value})}><option value="cash">Rs</option><option value="percent">%</option></select>
-            <input type="number" placeholder="0" onChange={e => setUnloading({...unloading, val: e.target.value})} />
+          <div className="mini-field"><label>Unloading</label>
+            <select onChange={e => setUnloading({...unloading, type:e.target.value})}><option value="cash">Rs</option><option value="percent">%</option></select>
+            <input type="number" onChange={e => setUnloading({...unloading, val:e.target.value})} />
           </div>
         </div>
 
-        <div className="calc-field">
-          <span style={{fontSize:'10px'}}>EXTRA CHARGES / MISC</span>
-          <input style={{width:'100%'}} type="number" placeholder="Enter amount" onChange={e => setExtraCharges(e.target.value)} />
+        <div className="grand-total">
+          <div style={{fontSize:'11px', textTransform:'uppercase'}}>Net Total</div>
+          <div style={{fontSize:'22px', fontWeight:'900'}}>Rs. {calculateFinal().toLocaleString()}</div>
         </div>
 
-        {/* Payment Split */}
-        <div className="input-row" style={{marginTop:'10px'}}>
-          <select className="search-bar" onChange={e => setPaymentType(e.target.value)}>
-            <option value="cash">Full Cash</option>
-            <option value="credit">Full Credit (Udhaar)</option>
-            <option value="partial">Partial (Some Cash + Credit)</option>
-          </select>
-          {paymentType === 'partial' && <input type="number" className="search-bar" placeholder="Paid Amount" onChange={e => setPaidAmount(e.target.value)} />}
-        </div>
-
-        <div className="total-banner">
-          <div style={{fontSize:'12px', fontWeight:'normal'}}>Net Payable Amount</div>
-          Rs. {finalAmount.toLocaleString()}
-        </div>
-
-        <button className="checkout-btn" style={{width:'100%', padding:'15px', marginTop:'10px', background:'#10b981', fontWeight:'bold', cursor:'pointer'}} onClick={handleSale}>
-          FINALIZE SALE & PRINT
+        <button className="btn-save" onClick={handleSale} disabled={isProcessing}>
+          {isProcessing ? "PROCESSING..." : "FINALIZE & PRINT BILL"}
         </button>
       </div>
     </div>

@@ -145,11 +145,10 @@ const AddItem = ({ editData, onComplete }) => {
   return (
     <div className="add-item-container">
       <style>{styles}</style>
+          <h2 style={{ fontStyle: 'italic', fontWeight: '900', color: '#f59e0b', marginBottom: '30px' }}>PRODUCT REGISTRATION</h2>
       <div className="layout-grid">
         {/* LEFT CARD - FORM */}
         <div className="form-card">
-          <h2 style={{ fontStyle: 'italic', fontWeight: '900', color: '#f59e0b', marginBottom: '30px' }}>PRODUCT REGISTRATION</h2>
-          
           <div className="form-inner-container">
             <form onSubmit={handleSubmit}>
               <div className="input-group-single"><label className="label-text">Item Name *</label><input className="custom-input" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})} required /></div>
@@ -242,3 +241,4 @@ const AddItem = ({ editData, onComplete }) => {
 };
 
 export default AddItem;
+

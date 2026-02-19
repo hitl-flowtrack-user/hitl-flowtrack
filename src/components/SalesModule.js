@@ -1,191 +1,122 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, onSnapshot, addDoc, serverTimestamp, query, orderBy, limit } from "firebase/firestore";
 
 const SalesModule = () => {
   const [items, setItems] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState([]);
   const [customer, setCustomer] = useState('');
-  const [charges, setCharges] = useState({ discount: 0, labour: 0, freight: 0 });
-  const [recentSales, setRecentSales] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  
-  const printRef = useRef();
+  const [recentSales, setRecentSales] = useState([]);
+  const [charges, setCharges] = useState({ discount: 0, labour: 0, freight: 0 });
 
-  // Load Inventory & Recent Sales
   useEffect(() => {
-    const unsubInv = onSnapshot(collection(db, "inventory_records"), (snap) => {
-      setItems(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    const unsubSales = onSnapshot(query(collection(db, "sales_records"), orderBy("createdAt", "desc"), limit(5)), (snap) => {
-      setRecentSales(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    return () => { unsubInv(); unsubSales(); };
+    onSnapshot(collection(db, "inventory_records"), (s) => setItems(s.docs.map(d => ({id: d.id, ...d.data()}))));
+    onSnapshot(query(collection(db, "sales_records"), orderBy("createdAt", "desc"), limit(5)), (s) => setRecentSales(s.docs.map(d => d.data())));
   }, []);
 
-  const addToCart = (item) => {
-    const exist = cart.find(c => c.id === item.id);
-    if (exist) {
-      setCart(cart.map(c => c.id === item.id ? { ...c, qty: c.qty + 1 } : c));
-    } else {
-      setCart([...cart, { ...item, qty: 1 }]);
-    }
+  const addToCart = (i) => {
+    const ex = cart.find(c => c.id === i.id);
+    if(ex) setCart(cart.map(c => c.id === i.id ? {...c, qty: c.qty + 1} : c));
+    else setCart([...cart, {...i, qty: 1}]);
   };
 
-  const calculateSubTotal = () => cart.reduce((acc, c) => acc + (parseFloat(c.retailPrice) * c.qty), 0);
-  const grandTotal = calculateSubTotal() - parseFloat(charges.discount || 0) + parseFloat(charges.labour || 0) + parseFloat(charges.freight || 0);
+  const subTotal = cart.reduce((a, c) => a + (c.retailPrice * c.qty), 0);
+  const grandTotal = subTotal - parseFloat(charges.discount || 0) + parseFloat(charges.labour || 0) + parseFloat(charges.freight || 0);
 
-  const handleProcessSale = async () => {
-    if (cart.length === 0 || isProcessing) return;
-    
-    setIsProcessing(true); // Stop double clicks
-    const invoiceNo = `INV-${Date.now().toString().slice(-6)}`;
-    
-    const saleData = {
-      invoiceNo,
-      customerName: customer || "Walking Customer",
-      cart,
-      subTotal: calculateSubTotal(),
-      ...charges,
-      totalAmount: grandTotal,
-      createdAt: serverTimestamp(),
-      dateString: new Date().toLocaleDateString(),
-      timeString: new Date().toLocaleTimeString()
+  const handleSave = async () => {
+    if(cart.length === 0 || isProcessing) return;
+    setIsProcessing(true);
+    const inv = `INV-${Math.floor(1000 + Math.random() * 9000)}`;
+    const data = {
+      invoiceNo: inv, customerName: customer || "Walking Customer",
+      cart, totalAmount: grandTotal, subTotal, ...charges,
+      createdAt: serverTimestamp(), timeString: new Date().toLocaleTimeString()
     };
-
-    try {
-      await addDoc(collection(db, "sales_records"), saleData);
-      window.print();
-      setCart([]);
-      setCustomer('');
-      setCharges({ discount: 0, labour: 0, freight: 0 });
-    } catch (e) {
-      console.error("Error saving sale:", e);
-    } finally {
-      setIsProcessing(false);
-    }
+    await addDoc(collection(db, "sales_records"), data);
+    window.print();
+    setCart([]); setCustomer(''); setIsProcessing(false);
   };
 
   const styles = `
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+    .pos-main { background: #000; min-height: 100vh; display: grid; grid-template-columns: 1fr 400px; padding: 20px; font-family: 'Inter', sans-serif; gap: 20px; }
+    .panel { background: #0a0a0a; border-radius: 30px; border: 1px solid #1a1a1a; padding: 25px; }
+    .item-btn { background: #111; border: 1px solid #222; border-radius: 15px; padding: 15px; text-align: center; cursor: pointer; color: #fff; }
+    .item-btn:hover { border-color: #D4AF37; }
+    .bill-box { background: #0d0d0d; border: 1px solid #D4AF37; border-radius: 30px; padding: 20px; position: sticky; top: 20px; }
+    .print-only { display: none; }
     
-    .pos-container { 
-      background: #050505; min-height: 100vh; padding: 20px; 
-      font-family: 'Inter', sans-serif; display: grid; 
-      grid-template-columns: 1fr 420px; gap: 20px; 
-    }
-
-    /* Left Panel: Items */
-    .item-panel { background: #0a0a0a; border-radius: 25px; padding: 25px; border: 1px solid #1a1a1a; }
-    .search-input { 
-      width: 100%; padding: 18px; background: #000; border: 2px solid #222; 
-      border-radius: 15px; color: #fff; font-size: 16px; margin-bottom: 20px;
-    }
-    .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
-    .p-card { 
-      background: #111; padding: 15px; border-radius: 18px; text-align: center; 
-      border: 1px solid #222; cursor: pointer; transition: 0.2s;
-    }
-    .p-card:hover { border-color: #D4AF37; transform: translateY(-3px); }
-
-    /* Right Panel: Billing */
-    .billing-panel { background: #0d0d0d; border-radius: 25px; padding: 25px; border: 1px solid #D4AF37; position: sticky; top: 20px; height: fit-content; }
-    .cart-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #1a1a1a; font-size: 14px; }
-    
-    .total-section { background: #D4AF37; color: #000; padding: 20px; border-radius: 20px; margin-top: 20px; text-align: center; }
-    
-    .btn-pay { 
-      width: 100%; padding: 18px; background: #3fb950; border: none; 
-      border-radius: 15px; color: #fff; font-weight: 900; font-size: 18px; 
-      margin-top: 15px; cursor: pointer; transition: 0.3s;
-    }
-    .btn-pay:disabled { background: #222; cursor: not-allowed; }
-
-    /* Recent Sales Reprint List */
-    .recent-list { margin-top: 20px; background: #0a0a0a; border-radius: 20px; padding: 15px; }
-    .recent-row { display: flex; justify-content: space-between; font-size: 12px; padding: 8px 0; border-bottom: 1px dotted #222; }
-
-    /* Print Specific Styles */
     @media print {
-      body * { visibility: hidden; }
-      #print-area, #print-area * { visibility: visible; }
-      #print-area { position: absolute; left: 0; top: 0; width: 80mm; background: #fff !important; color: #000 !important; padding: 10px; font-family: 'Courier New', Courier, monospace; }
-      .no-print { display: none !important; }
+      body * { display: none; }
+      .print-only { display: block !important; width: 80mm; padding: 10px; font-family: 'Courier New'; color: #000; }
+      .print-only * { display: block; }
     }
-
-    @media (max-width: 900px) { .pos-container { grid-template-columns: 1fr; } }
   `;
 
   return (
-    <div className="pos-container">
+    <div className="pos-main">
       <style>{styles}</style>
       
-      {/* Left Side */}
-      <div className="item-panel no-print">
-        <h2 style={{color:'#D4AF37', marginTop:0}}>TERMINAL</h2>
-        <input className="search-input" placeholder="Search product..." onChange={e => setSearchTerm(e.target.value)} />
-        <div className="product-grid">
+      {/* Inventory Panel */}
+      <div className="panel">
+        <h2 style={{color: '#D4AF37'}}>SALES TERMINAL</h2>
+        <input style={{width:'100%', padding:'15px', background:'#000', border:'1px solid #333', borderRadius:'12px', color:'#fff', marginBottom:'20px'}} placeholder="Search items..." onChange={e => setSearchTerm(e.target.value)} />
+        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(130px, 1fr))', gap:'10px'}}>
           {items.filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
-            <div key={item.id} className="p-card" onClick={() => addToCart(item)}>
-              <div style={{fontWeight:700}}>{item.name}</div>
-              <div style={{color:'#D4AF37', fontWeight:900}}>Rs. {item.retailPrice}</div>
-            </div>
-          ))}
-        </div>
-
-        <div className="recent-list">
-          <h4 style={{margin:0, color:'#555'}}>REPRINT RECENT BILLS</h4>
-          {recentSales.map((s, i) => (
-            <div key={i} className="recent-row">
-              <span>{s.invoiceNo} - {s.customerName}</span>
-              <button onClick={() => window.print()} style={{background:'#222', color:'#D4AF37', border:'none', borderRadius:'5px', fontSize:'10px', cursor:'pointer'}}>REPRINT</button>
+            <div key={item.id} className="item-btn" onClick={() => addToCart(item)}>
+              <strong>{item.name}</strong><br/><span style={{color:'#D4AF37'}}>Rs. {item.retailPrice}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Right Side / Invoice Area */}
-      <div className="billing-panel" id="print-area">
-        <div style={{textAlign:'center', marginBottom:'20px'}}>
-          <h2 style={{margin:0}}>PREMIUM CERAMICS</h2>
-          <p style={{fontSize:'12px', margin:0}}>Main Road, Business Center, Jaranwala</p>
-          <p style={{fontSize:'12px', margin:0}}>Contact: 0300-1234567</p>
-          <hr style={{border:'0.5px dashed #333'}} />
-          <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginTop:'10px'}}>
-            <span>Date: {new Date().toLocaleDateString()}</span>
-            <span>Time: {new Date().toLocaleTimeString()}</span>
-          </div>
-          <div style={{textAlign:'left', fontSize:'11px', fontWeight:'bold', marginTop:'5px'}}>INV-NO: {`INV-${Date.now().toString().slice(-6)}`}</div>
-        </div>
-
-        <div style={{minHeight:'150px'}}>
-          <div style={{display:'flex', justifyContent:'space-between', fontSize:'12px', fontWeight:'bold', borderBottom:'1px solid #333', paddingBottom:'5px'}}>
-            <span>Description</span>
-            <span>Amount</span>
-          </div>
+      {/* Bill Panel */}
+      <div className="bill-box">
+        <h3 style={{color:'#D4AF37', marginTop:0}}>BILL SUMMARY</h3>
+        <input style={{width:'100%', padding:'10px', background:'#000', border:'1px solid #222', color:'#fff', borderRadius:'10px', marginBottom:'15px'}} placeholder="Customer Name" value={customer} onChange={e => setCustomer(e.target.value)} />
+        
+        <div style={{maxHeight: '200px', overflowY:'auto', borderBottom:'1px solid #222', marginBottom:'15px'}}>
           {cart.map((c, i) => (
-            <div key={i} className="cart-item">
-              <span>{c.name} (x{c.qty})</span>
+            <div key={i} style={{display:'flex', justifyContent:'space-between', padding:'8px 0', fontSize:'14px', color:'#fff'}}>
+              <span>{c.name} x{c.qty}</span>
               <span>{c.qty * c.retailPrice}</span>
             </div>
           ))}
         </div>
 
-        <div style={{marginTop:'15px', fontSize:'13px'}}>
-          <div style={{display:'flex', justifyContent:'space-between'}}><span>Sub Total:</span><span>Rs. {calculateSubTotal()}</span></div>
-          <div style={{display:'flex', justifyContent:'space-between'}} className="no-print"><span>Discount:</span><input type="number" style={{width:'60px', background:'transparent', color:'#D4AF37', border:'1px solid #333', textAlign:'right'}} onChange={e => setCharges({...charges, discount: e.target.value})} /></div>
-          <div style={{display:'flex', justifyContent:'space-between', fontWeight:'bold', fontSize:'16px', marginTop:'10px'}}><span>GRAND TOTAL:</span><span>Rs. {grandTotal}</span></div>
+        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'5px'}}>
+          <input style={{padding:'8px', background:'#000', color:'#D4AF37', border:'1px solid #222'}} placeholder="Disc" onChange={e => setCharges({...charges, discount: e.target.value})} />
+          <input style={{padding:'8px', background:'#000', color:'#D4AF37', border:'1px solid #222'}} placeholder="Lab" onChange={e => setCharges({...charges, labour: e.target.value})} />
+          <input style={{padding:'8px', background:'#000', color:'#D4AF37', border:'1px solid #222'}} placeholder="Frt" onChange={e => setCharges({...charges, freight: e.target.value})} />
         </div>
 
-        <button className="btn-pay no-print" disabled={isProcessing} onClick={handleProcessSale}>
+        <div style={{background:'#D4AF37', color:'#000', padding:'20px', borderRadius:'15px', textAlign:'center', marginTop:'15px'}}>
+          <small>GRAND TOTAL</small>
+          <h2 style={{margin:0, fontSize:'30px'}}>Rs. {grandTotal}</h2>
+        </div>
+
+        <button onClick={handleSave} disabled={isProcessing} style={{width:'100%', padding:'18px', background:'#3fb950', border:'none', borderRadius:'15px', color:'#fff', fontWeight:900, fontSize:'16px', marginTop:'15px', cursor:'pointer'}}>
           {isProcessing ? "PROCESSING..." : "FINALIZE & PRINT"}
         </button>
+      </div>
 
-        <div style={{textAlign:'center', marginTop:'20px', fontSize:'10px'}} className="print-only">
-          <p>Thank you for your business!</p>
-          <p>Software by Gemini Tech 2026</p>
+      {/* Professional Print Invoice (Hidden on Screen) */}
+      <div className="print-only">
+        <div style={{textAlign:'center'}}>
+          <h2>PREMIUM CERAMICS</h2>
+          <p>Address: Jaranwala Road</p>
+          <hr/>
         </div>
+        {cart.map((c, i) => (
+          <div key={i} style={{display:'flex', justifyContent:'space-between'}}>
+            <span>{c.name} x{c.qty}</span>
+            <span>{c.qty * c.retailPrice}</span>
+          </div>
+        ))}
+        <hr/>
+        <div style={{fontWeight:'bold'}}>TOTAL: Rs. {grandTotal}</div>
+        <p style={{textAlign:'center', marginTop:'20px'}}>Thank you!</p>
       </div>
     </div>
   );

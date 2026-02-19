@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, serverTimestamp, query, orderBy, limit } from "firebase/firestore";
 
 const SalesModule = () => {
   const [items, setItems] = useState([]);
@@ -8,12 +8,20 @@ const SalesModule = () => {
   const [cart, setCart] = useState([]);
   const [customer, setCustomer] = useState('');
   const [charges, setCharges] = useState({ discount: 0, labour: 0, freight: 0 });
+  const [recentSales, setRecentSales] = useState([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  
+  const printRef = useRef();
 
+  // Load Inventory & Recent Sales
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "inventory_records"), (snap) => {
+    const unsubInv = onSnapshot(collection(db, "inventory_records"), (snap) => {
       setItems(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    return unsub;
+    const unsubSales = onSnapshot(query(collection(db, "sales_records"), orderBy("createdAt", "desc"), limit(5)), (snap) => {
+      setRecentSales(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => { unsubInv(); unsubSales(); };
   }, []);
 
   const addToCart = (item) => {
@@ -25,96 +33,159 @@ const SalesModule = () => {
     }
   };
 
-  const subTotal = cart.reduce((acc, c) => acc + (c.retailPrice * c.qty), 0);
-  const grandTotal = subTotal - parseFloat(charges.discount || 0) + parseFloat(charges.labour || 0) + parseFloat(charges.freight || 0);
+  const calculateSubTotal = () => cart.reduce((acc, c) => acc + (parseFloat(c.retailPrice) * c.qty), 0);
+  const grandTotal = calculateSubTotal() - parseFloat(charges.discount || 0) + parseFloat(charges.labour || 0) + parseFloat(charges.freight || 0);
 
   const handleProcessSale = async () => {
-    if (cart.length === 0) return alert("Cart is empty!");
+    if (cart.length === 0 || isProcessing) return;
+    
+    setIsProcessing(true); // Stop double clicks
+    const invoiceNo = `INV-${Date.now().toString().slice(-6)}`;
+    
     const saleData = {
-      customerName: customer,
+      invoiceNo,
+      customerName: customer || "Walking Customer",
       cart,
-      subTotal,
+      subTotal: calculateSubTotal(),
       ...charges,
       totalAmount: grandTotal,
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
+      dateString: new Date().toLocaleDateString(),
+      timeString: new Date().toLocaleTimeString()
     };
+
     try {
       await addDoc(collection(db, "sales_records"), saleData);
-      alert("Sale Saved Successfully!");
-      window.print(); // Triggers Print
-      setCart([]); setCustomer('');
-    } catch (e) { console.error(e); }
+      window.print();
+      setCart([]);
+      setCustomer('');
+      setCharges({ discount: 0, labour: 0, freight: 0 });
+    } catch (e) {
+      console.error("Error saving sale:", e);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const styles = `
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap');
-    .pos-wrapper { background: #000; min-height: 100vh; padding: 20px; font-family: 'Outfit', sans-serif; display: grid; grid-template-columns: 1fr 450px; gap: 20px; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
     
-    .inventory-panel { background: #0a0a0a; border-radius: 30px; padding: 25px; border: 1px solid #1a1a1a; }
-    .billing-panel { background: #0d0d0d; border-radius: 30px; padding: 25px; border: 1px solid #D4AF37; position: sticky; top: 20px; height: fit-content; }
-
-    .item-card { 
-      background: #111; padding: 15px; border-radius: 20px; text-align: center; border: 1px solid #222; cursor: pointer; transition: 0.2s;
+    .pos-container { 
+      background: #050505; min-height: 100vh; padding: 20px; 
+      font-family: 'Inter', sans-serif; display: grid; 
+      grid-template-columns: 1fr 420px; gap: 20px; 
     }
-    .item-card:hover { border-color: #D4AF37; transform: scale(1.02); }
 
-    .input-pro { width: 100%; padding: 12px; background: #000; border: 1px solid #333; border-radius: 12px; color: #fff; margin-bottom: 15px; outline: none; }
-    .input-pro:focus { border-color: #D4AF37; }
+    /* Left Panel: Items */
+    .item-panel { background: #0a0a0a; border-radius: 25px; padding: 25px; border: 1px solid #1a1a1a; }
+    .search-input { 
+      width: 100%; padding: 18px; background: #000; border: 2px solid #222; 
+      border-radius: 15px; color: #fff; font-size: 16px; margin-bottom: 20px;
+    }
+    .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+    .p-card { 
+      background: #111; padding: 15px; border-radius: 18px; text-align: center; 
+      border: 1px solid #222; cursor: pointer; transition: 0.2s;
+    }
+    .p-card:hover { border-color: #D4AF37; transform: translateY(-3px); }
 
-    .total-display { background: #D4AF37; color: #000; padding: 20px; border-radius: 20px; text-align: center; margin-top: 20px; }
+    /* Right Panel: Billing */
+    .billing-panel { background: #0d0d0d; border-radius: 25px; padding: 25px; border: 1px solid #D4AF37; position: sticky; top: 20px; height: fit-content; }
+    .cart-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #1a1a1a; font-size: 14px; }
     
+    .total-section { background: #D4AF37; color: #000; padding: 20px; border-radius: 20px; margin-top: 20px; text-align: center; }
+    
+    .btn-pay { 
+      width: 100%; padding: 18px; background: #3fb950; border: none; 
+      border-radius: 15px; color: #fff; font-weight: 900; font-size: 18px; 
+      margin-top: 15px; cursor: pointer; transition: 0.3s;
+    }
+    .btn-pay:disabled { background: #222; cursor: not-allowed; }
+
+    /* Recent Sales Reprint List */
+    .recent-list { margin-top: 20px; background: #0a0a0a; border-radius: 20px; padding: 15px; }
+    .recent-row { display: flex; justify-content: space-between; font-size: 12px; padding: 8px 0; border-bottom: 1px dotted #222; }
+
+    /* Print Specific Styles */
     @media print {
-      .inventory-panel, .input-pro, .btn-main { display: none !important; }
-      .billing-panel { border: none; width: 100%; position: static; color: #000 !important; background: #fff !important; }
-      .pos-wrapper { display: block; background: #fff; }
+      body * { visibility: hidden; }
+      #print-area, #print-area * { visibility: visible; }
+      #print-area { position: absolute; left: 0; top: 0; width: 80mm; background: #fff !important; color: #000 !important; padding: 10px; font-family: 'Courier New', Courier, monospace; }
+      .no-print { display: none !important; }
     }
-    @media (max-width: 900px) { .pos-wrapper { grid-template-columns: 1fr; } }
+
+    @media (max-width: 900px) { .pos-container { grid-template-columns: 1fr; } }
   `;
 
   return (
-    <div className="pos-wrapper">
+    <div className="pos-container">
       <style>{styles}</style>
       
-      <div className="inventory-panel">
+      {/* Left Side */}
+      <div className="item-panel no-print">
         <h2 style={{color:'#D4AF37', marginTop:0}}>TERMINAL</h2>
-        <input className="input-pro" placeholder="Search product..." onChange={e => setSearchTerm(e.target.value)} />
-        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(130px, 1fr))', gap:'12px'}}>
+        <input className="search-input" placeholder="Search product..." onChange={e => setSearchTerm(e.target.value)} />
+        <div className="product-grid">
           {items.filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
-            <div key={item.id} className="item-card" onClick={() => addToCart(item)}>
-              <div style={{fontWeight:700, fontSize:'14px'}}>{item.name}</div>
+            <div key={item.id} className="p-card" onClick={() => addToCart(item)}>
+              <div style={{fontWeight:700}}>{item.name}</div>
               <div style={{color:'#D4AF37', fontWeight:900}}>Rs. {item.retailPrice}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="recent-list">
+          <h4 style={{margin:0, color:'#555'}}>REPRINT RECENT BILLS</h4>
+          {recentSales.map((s, i) => (
+            <div key={i} className="recent-row">
+              <span>{s.invoiceNo} - {s.customerName}</span>
+              <button onClick={() => window.print()} style={{background:'#222', color:'#D4AF37', border:'none', borderRadius:'5px', fontSize:'10px', cursor:'pointer'}}>REPRINT</button>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="billing-panel">
-        <h3 style={{marginTop:0, color:'#D4AF37'}}>BILLING CONSOLE</h3>
-        <input className="input-pro" placeholder="Customer Name" value={customer} onChange={e => setCustomer(e.target.value)} />
-        
-        <div style={{maxHeight:'200px', overflowY:'auto', borderBottom:'1px solid #222'}}>
+      {/* Right Side / Invoice Area */}
+      <div className="billing-panel" id="print-area">
+        <div style={{textAlign:'center', marginBottom:'20px'}}>
+          <h2 style={{margin:0}}>PREMIUM CERAMICS</h2>
+          <p style={{fontSize:'12px', margin:0}}>Main Road, Business Center, Jaranwala</p>
+          <p style={{fontSize:'12px', margin:0}}>Contact: 0300-1234567</p>
+          <hr style={{border:'0.5px dashed #333'}} />
+          <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginTop:'10px'}}>
+            <span>Date: {new Date().toLocaleDateString()}</span>
+            <span>Time: {new Date().toLocaleTimeString()}</span>
+          </div>
+          <div style={{textAlign:'left', fontSize:'11px', fontWeight:'bold', marginTop:'5px'}}>INV-NO: {`INV-${Date.now().toString().slice(-6)}`}</div>
+        </div>
+
+        <div style={{minHeight:'150px'}}>
+          <div style={{display:'flex', justifyContent:'space-between', fontSize:'12px', fontWeight:'bold', borderBottom:'1px solid #333', paddingBottom:'5px'}}>
+            <span>Description</span>
+            <span>Amount</span>
+          </div>
           {cart.map((c, i) => (
-            <div key={i} style={{display:'flex', justifyBetween:'space-between', padding:'10px 0'}}>
-              <span style={{flex:1}}>{c.name} x{c.qty}</span>
-              <span style={{fontWeight:900}}>Rs. {c.qty * c.retailPrice}</span>
+            <div key={i} className="cart-item">
+              <span>{c.name} (x{c.qty})</span>
+              <span>{c.qty * c.retailPrice}</span>
             </div>
           ))}
         </div>
 
-        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'10px', marginTop:'15px'}}>
-          <div><label style={{fontSize:'10px'}}>DISC</label><input className="input-pro" type="number" onChange={e => setCharges({...charges, discount: e.target.value})} /></div>
-          <div><label style={{fontSize:'10px'}}>LABOUR</label><input className="input-pro" type="number" onChange={e => setCharges({...charges, labour: e.target.value})} /></div>
-          <div><label style={{fontSize:'10px'}}>FRT</label><input className="input-pro" type="number" onChange={e => setCharges({...charges, freight: e.target.value})} /></div>
+        <div style={{marginTop:'15px', fontSize:'13px'}}>
+          <div style={{display:'flex', justifyContent:'space-between'}}><span>Sub Total:</span><span>Rs. {calculateSubTotal()}</span></div>
+          <div style={{display:'flex', justifyContent:'space-between'}} className="no-print"><span>Discount:</span><input type="number" style={{width:'60px', background:'transparent', color:'#D4AF37', border:'1px solid #333', textAlign:'right'}} onChange={e => setCharges({...charges, discount: e.target.value})} /></div>
+          <div style={{display:'flex', justifyContent:'space-between', fontWeight:'bold', fontSize:'16px', marginTop:'10px'}}><span>GRAND TOTAL:</span><span>Rs. {grandTotal}</span></div>
         </div>
 
-        <div className="total-display">
-          <div style={{fontSize:'12px', fontWeight:700}}>GRAND TOTAL</div>
-          <div style={{fontSize:'36px', fontWeight:900}}>Rs. {grandTotal.toLocaleString()}</div>
-        </div>
-
-        <button className="btn-main" onClick={handleProcessSale} style={{width:'100%', padding:'20px', background:'#3fb950', border:'none', borderRadius:'20px', color:'#fff', fontWeight:900, fontSize:'18px', marginTop:'15px', cursor:'pointer'}}>
-          SAVE & PRINT BILL
+        <button className="btn-pay no-print" disabled={isProcessing} onClick={handleProcessSale}>
+          {isProcessing ? "PROCESSING..." : "FINALIZE & PRINT"}
         </button>
+
+        <div style={{textAlign:'center', marginTop:'20px', fontSize:'10px'}} className="print-only">
+          <p>Thank you for your business!</p>
+          <p>Software by Gemini Tech 2026</p>
+        </div>
       </div>
     </div>
   );

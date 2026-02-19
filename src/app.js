@@ -1,19 +1,16 @@
 import React, { useState } from 'react';
-
-// --- FIXED IMPORTS (Matching your exact folder and naming) ---
 import AddItem from './components/additem';
 import InventoryView from './components/inventoryview';
 import DashboardSummary from './components/DashboardSummary';
-import SalesModule from './components/SalesModule'; // Capitalized S and M to match file
+import SalesModule from './components/SalesModule';
 import SalesHistory from './components/SalesHistory';
-import Reports from './components/Reports'; 
-import ExpenseTracker from './components/ExpenseTracker';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [editData, setEditData] = useState(null);
 
+  // Function to handle switching to Edit mode from Inventory
   const handleEdit = (item) => {
     setEditData(item);
     setActiveTab('additem');
@@ -26,35 +23,32 @@ function App() {
     { id: 'inventory', label: 'Stock View', icon: '📦' },
     { id: 'sales', label: 'New Sale (POS)', icon: '💰' },
     { id: 'history', label: 'Sales History', icon: '📜' },
-    { id: 'reports', label: 'Reports & Profit', icon: '📈' },
-    { id: 'expenses', label: 'Expenses', icon: '💸' },
   ];
 
   const styles = `
     .app-wrapper { display: flex; background: #000; min-height: 100vh; color: #fff; position: relative; }
     
+    /* Sidebar Styling */
     .sidebar { 
-      width: 260px; background: #111; height: 100vh; position: fixed; 
-      left: ${isSidebarOpen ? '0' : '-260px'}; 
+      width: 260px; background: #111; height: 100vh; position: fixed; left: ${isSidebarOpen ? '0' : '-260px'}; 
       transition: 0.3s; z-index: 1000; border-right: 1px solid #222; padding-top: 60px;
     }
-
     .sidebar-overlay {
       display: ${isSidebarOpen ? 'block' : 'none'}; position: fixed; top: 0; left: 0; 
       width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999;
     }
     
     .menu-btn { 
-      position: fixed; top: 15px; left: 15px; z-index: 1001; background: #D4AF37; 
+      position: fixed; top: 15px; left: 15px; z-index: 1001; background: #f59e0b; 
       border: none; border-radius: 5px; padding: 8px 12px; cursor: pointer; color: #000; font-weight: bold;
     }
 
     .nav-item { 
       padding: 15px 25px; cursor: pointer; display: flex; align-items: center; gap: 15px;
-      transition: 0.2s; font-weight: 500; color: #aaa; text-decoration: none;
+      transition: 0.2s; font-weight: 500; color: #aaa;
     }
-    .nav-item:hover { background: #1a1a1a; color: #D4AF37; }
-    .nav-item.active { background: #1a1a1a; color: #D4AF37; border-left: 4px solid #D4AF37; }
+    .nav-item:hover { background: #1a1a1a; color: #f59e0b; }
+    .nav-item.active { background: #1a1a1a; color: #f59e0b; border-left: 4px solid #f59e0b; }
 
     .main-content { 
       flex: 1; margin-left: 0; transition: 0.3s; width: 100%;
@@ -62,7 +56,7 @@ function App() {
     }
 
     .logo-area { padding: 0 25px 30px; border-bottom: 1px solid #222; margin-bottom: 20px; }
-    .logo-text { font-style: italic; font-weight: 900; color: #D4AF37; font-size: 20px; }
+    .logo-text { font-style: italic; font-weight: 900; color: #f59e0b; font-size: 20px; }
   `;
 
   return (
@@ -80,8 +74,8 @@ function App() {
       {/* Sidebar Navigation */}
       <nav className="sidebar">
         <div className="logo-area">
-          <div className="logo-text">PREMIUM IMS</div>
-          <small style={{color:'#444'}}>v2.1 Build Fix</small>
+          <div className="logo-text">GEMINI IMS</div>
+          <small style={{color:'#444'}}>v2.0 Beta</small>
         </div>
         {menuItems.map(item => (
           <div 
@@ -90,7 +84,7 @@ function App() {
             onClick={() => {
               setActiveTab(item.id);
               setSidebarOpen(false);
-              if(item.id !== 'additem') setEditData(null);
+              if(item.id !== 'additem') setEditData(null); // Clear edit data if moving away
             }}
           >
             <span>{item.icon}</span> {item.label}
@@ -119,10 +113,6 @@ function App() {
         {activeTab === 'sales' && <SalesModule />}
         
         {activeTab === 'history' && <SalesHistory />}
-
-        {activeTab === 'reports' && <Reports />}
-
-        {activeTab === 'expenses' && <ExpenseTracker />}
       </main>
     </div>
   );

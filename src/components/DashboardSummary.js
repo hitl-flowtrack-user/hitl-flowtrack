@@ -18,151 +18,173 @@ const DashboardSummary = () => {
     return () => { unsubInv(); unsubSales(); };
   }, []);
 
-  const totalRevenue = sales.reduce((a, s) => a + (s.totalAmount || 0), 0);
-  const totalStock = items.reduce((a, c) => a + (parseFloat(c.totalPcs) || 0), 0);
+  const totalRevenue = sales.reduce((a, s) => a + (parseFloat(s.totalAmount) || 0), 0);
+  const totalStockVal = items.reduce((a, c) => a + ((parseFloat(c.purchasePrice) || 0) * (parseFloat(c.totalPcs) || 0)), 0);
 
   const styles = `
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
     
-    .dash-container { 
-      padding: 30px; background: #050505; min-height: 100vh; 
-      font-family: 'Outfit', sans-serif; color: #fff;
+    .dashboard-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      grid-template-rows: auto auto auto;
+      grid-template-rows: auto 180px 350px;
       gap: 20px;
+      padding: 30px;
+      background-color: #050505;
+      min-height: 100vh;
+      font-family: 'Outfit', sans-serif;
+      color: #fff;
     }
 
-    /* Reference Image Style - Grid Spanning */
-    .header-box { grid-column: span 4; display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; }
+    /* Top Welcome Bar */
+    .welcome-bar {
+      grid-column: span 4;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    /* Premium Glow Card Base */
+    .bento-card {
+      background: rgba(18, 18, 18, 0.6);
+      border: 1px solid rgba(212, 175, 55, 0.15);
+      border-radius: 28px;
+      padding: 25px;
+      backdrop-filter: blur(12px);
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      position: relative;
+      overflow: hidden;
+    }
+    .bento-card:hover {
+      border-color: #D4AF37;
+      box-shadow: 0 10px 40px rgba(212, 175, 55, 0.1);
+      transform: translateY(-5px);
+    }
+
+    /* Hero Card (Large Revenue) */
+    .hero-card {
+      grid-column: span 2;
+      grid-row: span 1;
+      background: linear-gradient(135deg, #111 0%, #050505 100%);
+      border-left: 5px solid #D4AF37;
+    }
+
+    /* Statistics Labels */
+    .label { color: #666; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; }
+    .amount { font-size: 38px; font-weight: 800; color: #D4AF37; margin-top: 10px; display: block; }
     
-    .main-chart-box { 
-      grid-column: span 2; grid-row: span 2; 
-      background: linear-gradient(145deg, #111, #000);
-      border: 1px solid rgba(212, 175, 55, 0.2);
-      border-radius: 30px; padding: 30px;
-      position: relative; overflow: hidden;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    /* Charts/Visual Placeholders */
+    .visual-glow {
+      position: absolute; bottom: -20px; right: -20px;
+      width: 150px; height: 150px;
+      background: radial-gradient(circle, rgba(212, 175, 55, 0.1) 0%, transparent 70%);
     }
 
-    .stat-small-box { 
-      grid-column: span 1; 
-      background: #111; border-radius: 25px; padding: 25px;
-      border: 1px solid #222; transition: 0.3s;
+    /* Lists */
+    .activity-list {
+      grid-column: span 2;
+      grid-row: span 1;
+      overflow-y: auto;
     }
-    .stat-small-box:hover { border-color: #D4AF37; transform: translateY(-5px); }
-
-    .activity-box { 
-      grid-column: span 2; 
-      background: #0a0a0a; border-radius: 30px; padding: 25px;
-      border: 1px solid #1a1a1a;
+    .item-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px;
+      margin-bottom: 10px;
+      background: rgba(255,255,255,0.02);
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.03);
     }
+    .item-row:hover { background: rgba(212, 175, 55, 0.05); }
 
-    /* Glowing Elements */
-    .gold-glow-text {
-      color: #D4AF37; font-weight: 900; 
-      text-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
-    }
-
-    .circle-progress {
-      width: 120px; height: 120px; border-radius: 50%;
-      border: 8px solid #1a1a1a; border-top: 8px solid #D4AF37;
-      display: flex; align-items: center; justify-content: center;
-      margin: 20px auto; box-shadow: 0 0 15px rgba(212, 175, 55, 0.2);
-    }
-
-    .list-item {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 15px; background: rgba(255,255,255,0.03);
-      border-radius: 15px; margin-bottom: 10px; border: 1px solid transparent;
-    }
-    .list-item:hover { border-color: rgba(212, 175, 55, 0.4); background: rgba(212, 175, 55, 0.05); }
-
-    .btn-gold {
-      background: #D4AF37; color: #000; border: none; padding: 10px 20px;
-      border-radius: 12px; font-weight: bold; cursor: pointer;
+    /* Tags */
+    .status-tag {
+      background: rgba(212, 175, 55, 0.1);
+      color: #D4AF37;
+      padding: 5px 12px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 800;
+      border: 1px solid rgba(212, 175, 55, 0.3);
     }
 
-    .mini-label { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+    /* Mini Progress */
+    .progress-container { width: 100%; height: 6px; background: #1a1a1a; border-radius: 10px; margin-top: 15px; }
+    .progress-bar { height: 100%; background: #D4AF37; border-radius: 10px; box-shadow: 0 0 10px #D4AF37; }
   `;
 
-  if (loading) return <div style={{background:'#000', color:'#D4AF37', textAlign:'center', paddingTop:'20%'}}>Loading Premium Dashboard...</div>;
+  if (loading) return <div style={{background:'#050505', color:'#D4AF37', height:'100vh', display:'flex', alignItems:'center', justifyContent:'center'}}>
+    <h2 style={{fontFamily:'Outfit'}}>LOADING PREMIER ANALYTICS...</h2>
+  </div>;
 
   return (
-    <div className="dash-container">
+    <div className="dashboard-grid">
       <style>{styles}</style>
       
-      {/* 1. Header Area */}
-      <div className="header-box">
+      {/* Top Section */}
+      <div className="welcome-bar">
         <div>
-          <h1 style={{margin:0, fontSize:'28px'}} className="gold-glow-text">DASHBOARD</h1>
-          <p style={{color:'#444', margin:0}}>Real-time business performance analytics</p>
+          <h1 style={{margin:0, fontWeight: 800, fontSize: '32px'}}>COMMAND <span style={{color:'#D4AF37'}}>CENTER</span></h1>
+          <p style={{color:'#444', margin:0, fontWeight: 400}}>Overview of your business performance & stock.</p>
         </div>
-        <button className="btn-gold">+ Generate Report</button>
-      </div>
-
-      {/* 2. Main Analytics Box (Inspired by the big chart in your image) */}
-      <div className="main-chart-box">
-        <span className="mini-label">Sales Revenue Performance</span>
-        <h2 style={{fontSize:'42px', margin:'10px 0'}} className="gold-glow-text">Rs. {totalRevenue.toLocaleString()}</h2>
-        <div style={{color:'#3fb950', fontSize:'14px'}}>▲ 12.5% since last month</div>
-        
-        <div className="circle-progress">
-          <div style={{textAlign:'center'}}>
-            <div style={{fontSize:'24px', fontWeight:'900'}}>75%</div>
-            <div style={{fontSize:'10px', color:'#555'}}>TARGET</div>
-          </div>
-        </div>
-        
-        <div style={{marginTop:'30px'}}>
-          <div style={{display:'flex', justifyContent:'space-between', marginBottom:'10px'}}>
-            <span>Efficiency</span>
-            <span style={{color:'#D4AF37'}}>92%</span>
-          </div>
-          <div style={{width:'100%', height:'8px', background:'#222', borderRadius:'10px'}}>
-            <div style={{width:'92%', height:'100%', background:'#D4AF37', borderRadius:'10px', boxShadow:'0 0 10px #D4AF37'}}></div>
-          </div>
+        <div style={{background:'#111', padding:'10px 20px', borderRadius:'15px', border:'1px solid #222'}}>
+          <span style={{color:'#666', fontSize:'12px'}}>DATE:</span> <span style={{fontWeight:'bold'}}>{new Date().toLocaleDateString()}</span>
         </div>
       </div>
 
-      {/* 3. Small Stat Boxes */}
-      <div className="stat-small-box">
-        <span className="mini-label">Total Stock</span>
-        <h3 style={{fontSize:'24px', margin:'10px 0'}}>{totalStock.toLocaleString()} Pcs</h3>
-        <div style={{color:'#888', fontSize:'12px'}}>Available in 3 Warehouses</div>
+      {/* Row 1: Big Stats */}
+      <div className="bento-card hero-card">
+        <span className="label">Total Revenue</span>
+        <span className="amount">Rs. {totalRevenue.toLocaleString()}</span>
+        <div className="progress-container"><div className="progress-bar" style={{width:'70%'}}></div></div>
+        <p style={{fontSize:'12px', color:'#3fb950', marginTop:'10px'}}>+ 18% Increase from last week</p>
+        <div className="visual-glow"></div>
       </div>
 
-      <div className="stat-small-box">
-        <span className="mini-label">Total Orders</span>
-        <h3 style={{fontSize:'24px', margin:'10px 0'}}>{sales.length}</h3>
-        <div style={{color:'#888', fontSize:'12px'}}>Completed Invoices</div>
+      <div className="bento-card">
+        <span className="label">Inventory Value</span>
+        <span className="amount" style={{fontSize:'28px'}}>Rs. {totalStockVal.toLocaleString()}</span>
+        <div className="progress-container"><div className="progress-bar" style={{width:'45%', background:'#666', boxShadow:'none'}}></div></div>
+        <div className="visual-glow"></div>
       </div>
 
-      {/* 4. Activity / Recent Sales (Side Panel style) */}
-      <div className="activity-box">
-        <h4 style={{margin:'0 0 20px 0', color:'#D4AF37'}}>RECENT ACTIVITY</h4>
+      <div className="bento-card">
+        <span className="label">Total Invoices</span>
+        <span className="amount" style={{fontSize:'28px'}}>{sales.length}</span>
+        <span className="status-tag" style={{marginTop:'10px', display:'inline-block'}}>ACTIVE SALES</span>
+      </div>
+
+      {/* Row 2: Detailed Lists */}
+      <div className="bento-card activity-list">
+        <h3 style={{margin:'0 0 20px 0', fontSize:'18px', color:'#D4AF37'}}>LATEST TRANSACTIONS</h3>
         {sales.slice(0, 4).map((sale, i) => (
-          <div className="list-item" key={i}>
+          <div className="item-row" key={i}>
             <div>
               <div style={{fontWeight:600, fontSize:'14px'}}>{sale.customerName}</div>
-              <small style={{color:'#555'}}>{new Date().toLocaleTimeString()}</small>
+              <div style={{fontSize:'11px', color:'#444'}}>{new Date().toLocaleTimeString()}</div>
             </div>
-            <div style={{color:'#D4AF37', fontWeight:'900'}}>Rs. {sale.totalAmount}</div>
+            <div style={{textAlign:'right'}}>
+              <div style={{fontWeight:800, color:'#D4AF37'}}>Rs. {sale.totalAmount}</div>
+              <div style={{fontSize:'9px', color:'#3fb950'}}>PAID</div>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* 5. Inventory Alert Box */}
-      <div className="activity-box">
-        <h4 style={{margin:'0 0 20px 0', color:'#D4AF37'}}>INVENTORY ALERTS</h4>
+      <div className="bento-card activity-list">
+        <h3 style={{margin:'0 0 20px 0', fontSize:'18px', color:'#D4AF37'}}>CRITICAL STOCK</h3>
         {items.filter(item => (parseFloat(item.openingStock) || 0) < 10).slice(0, 4).map((item, i) => (
-          <div className="list-item" key={i} style={{borderColor: 'rgba(239, 68, 68, 0.2)'}}>
-            <span style={{fontSize:'14px'}}>{item.name}</span>
-            <span style={{color:'#ef4444', fontWeight:'bold'}}>{item.openingStock} Left</span>
+          <div className="item-row" key={i} style={{borderLeft: '4px solid #ef4444'}}>
+            <div>
+              <div style={{fontWeight:600, fontSize:'14px'}}>{item.name}</div>
+              <div style={{fontSize:'11px', color:'#444'}}>WH: {item.warehouse}</div>
+            </div>
+            <div style={{color:'#ef4444', fontWeight:'bold'}}>{item.openingStock} Box</div>
           </div>
         ))}
       </div>
-
     </div>
   );
 };

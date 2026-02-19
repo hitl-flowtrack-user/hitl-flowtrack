@@ -2,12 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, onSnapshot, writeBatch, doc, serverTimestamp } from "firebase/firestore";
 
-const SalesModule = () => {
+const SalesModule = ({ user }) => { // User prop contains login ID/Name
   const [items, setItems] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState([]);
   const [customerName, setCustomerName] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [selectedWarehouse, setSelectedWarehouse] = useState('All');
+  
+  // Advanced Billing States
+  const [discount, setDiscount] = useState({ type: 'cash', val: 0 });
+  const [rent, setRent] = useState({ type: 'cash', val: 0 });
+  const [loading, setLoading] = useState({ type: 'cash', val: 0 });
+  const [unloading, setUnloading] = useState({ type: 'cash', val: 0 });
+  const [extraCharges, setExtraCharges] = useState(0);
+  
+  // Payment States
+  const [paymentType, setPaymentType] = useState('cash'); // cash, credit, partial
+  const [paidAmount, setPaidAmount] = useState(0);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "inventory_records"), (snapshot) => {
@@ -29,161 +40,168 @@ const SalesModule = () => {
     setCart(cart.map(c => c.id === id ? { ...c, quantity: parseInt(newQty) || 0 } : c));
   };
 
-  const removeFromCart = (id) => {
-    setCart(cart.filter(c => c.id !== id));
+  // Calculation Logic
+  const getSubTotal = () => cart.reduce((acc, c) => acc + (c.salePrice * c.quantity), 0);
+  
+  const calculateFinal = () => {
+    const sub = getSubTotal();
+    const getVal = (obj) => obj.type === 'percent' ? (sub * (obj.val / 100)) : parseFloat(obj.val || 0);
+    
+    const discVal = getVal(discount);
+    const rentVal = getVal(rent);
+    const loadVal = getVal(loading);
+    const unloadVal = getVal(unloading);
+    
+    return sub - discVal + rentVal + loadVal + unloadVal + parseFloat(extraCharges || 0);
   };
 
-  const calculateTotal = () => {
-    return cart.reduce((acc, c) => acc + (parseFloat(c.salePrice) * c.quantity), 0);
-  };
-
-  const printInvoice = (saleData) => {
-    const printWindow = window.open('', '_blank');
-    const invoiceHTML = `
-      <html>
-        <head>
-          <title>Invoice - ${saleData.customerName}</title>
-          <style>
-            body { font-family: sans-serif; padding: 20px; color: #333; }
-            .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border-bottom: 1px solid #ddd; padding: 10px; text-align: left; }
-            .total-sec { text-align: right; margin-top: 20px; font-size: 1.2em; font-weight: bold; }
-          </style>
-        </head>
-        <body>
-          <div class="header"><h1>INVENTORY STORE</h1><p>Sales Receipt</p></div>
-          <p><strong>Customer:</strong> ${saleData.customerName}</p>
-          <table>
-            <thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
-            <tbody>
-              ${saleData.items.map(item => `
-                <tr><td>${item.name}</td><td>${item.quantity}</td><td>${item.salePrice}</td><td>${(item.quantity * item.salePrice).toLocaleString()}</td></tr>
-              `).join('')}
-            </tbody>
-          </table>
-          <div class="total-sec">Grand Total: Rs. ${saleData.totalAmount.toLocaleString()}</div>
-        </body>
-      </html>
-    `;
-    printWindow.document.write(invoiceHTML);
-    printWindow.document.close();
-    printWindow.print();
-  };
+  const finalAmount = calculateFinal();
 
   const handleSale = async () => {
-    if (!customerName || cart.length === 0) return alert("Please add customer and items!");
-    
+    if (!customerName || cart.length === 0) return alert("Details missing!");
     setLoading(true);
     const batch = writeBatch(db);
 
     try {
-      // 1. Create a reference for the new sale document
       const saleRef = doc(collection(db, "sales_records"));
       const saleData = {
         customerName,
+        salesman: user?.name || "Admin",
+        salesmanId: user?.uid || "admin01",
         items: cart,
-        totalAmount: calculateTotal(),
-        createdAt: serverTimestamp()
+        subTotal: getSubTotal(),
+        discounts: discount,
+        charges: { rent, loading, unloading, extra: extraCharges },
+        totalAmount: finalAmount,
+        paymentStatus: paymentType,
+        paidAmount: paymentType === 'cash' ? finalAmount : (paymentType === 'credit' ? 0 : paidAmount),
+        balance: paymentType === 'credit' ? finalAmount : (paymentType === 'partial' ? finalAmount - paidAmount : 0),
+        warehouse: selectedWarehouse,
+        createdAt: serverTimestamp(),
       };
 
-      // 2. Add Sale Record to Batch
       batch.set(saleRef, saleData);
 
-      // 3. Add Inventory Updates to Batch
+      // Inventory Minus
       cart.forEach(product => {
         const itemRef = doc(db, "inventory_records", product.id);
-        const currentPcs = parseFloat(product.totalPcs) || 0;
-        const newStockPcs = currentPcs - product.quantity;
-        const pcsPerBox = parseFloat(product.pcsPerBox) || 1;
-        const newBoxes = newStockPcs / pcsPerBox;
-        
+        const newStockPcs = (parseFloat(product.totalPcs) || 0) - product.quantity;
         batch.update(itemRef, {
           totalPcs: newStockPcs,
-          openingStock: newBoxes.toFixed(2)
+          openingStock: (newStockPcs / (product.pcsPerBox || 1)).toFixed(2)
         });
       });
 
-      // 4. Commit all changes at once
       await batch.commit();
-
-      printInvoice(saleData);
-      setCart([]);
-      setCustomerName('');
-      alert("Sale Successful & Fast Saved!");
-
-    } catch (err) {
-      console.error(err);
-      alert("Error processing sale: " + err.message);
-    }
+      alert("Sale Recorded Successfully!");
+      setCart([]); setCustomerName('');
+    } catch (err) { alert(err.message); }
     setLoading(false);
   };
 
   const filteredItems = items.filter(item => 
-    item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.sku?.toLowerCase().includes(searchTerm.toLowerCase())
+    (selectedWarehouse === 'All' || item.warehouse === selectedWarehouse) &&
+    (item.name?.toLowerCase().includes(searchTerm.toLowerCase()) || item.sku?.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const styles = `
-    .sales-container { padding: 25px; background: #000; min-height: 100vh; color: #fff; font-family: 'Segoe UI', sans-serif; display: grid; grid-template-columns: 1fr 1.2fr; gap: 20px; }
-    .item-list { background: #111; padding: 20px; border-radius: 20px; border: 1px solid #222; max-height: 85vh; overflow-y: auto; }
-    .cart-panel { background: #111; padding: 25px; border-radius: 20px; border: 1px solid #222; border-top: 5px solid #10b981; position: sticky; top: 20px; }
-    .search-input { width: 100%; padding: 12px; background: #222; border: 1px solid #333; color: #fff; border-radius: 10px; margin-bottom: 15px; box-sizing: border-box; }
-    .product-row { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #222; cursor: pointer; border-radius: 8px; }
-    .product-row:hover { background: #1a1a1a; color: #f59e0b; }
-    .cart-table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
-    .cart-table th { text-align: left; color: #f59e0b; padding: 10px; border-bottom: 2px solid #222; }
-    .cart-table td { padding: 10px; border-bottom: 1px solid #222; }
-    .qty-input { width: 60px; padding: 5px; background: #000; border: 1px solid #444; color: #fff; text-align: center; border-radius: 5px; }
-    .checkout-btn { width: 100%; padding: 18px; background: #10b981; color: #000; border: none; border-radius: 12px; font-weight: 900; cursor: pointer; margin-top: 20px; font-size: 16px; }
+    .pos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; background: #000; color: #fff; padding: 10px; }
+    .item-box { background: #111; padding: 15px; border-radius: 12px; height: 85vh; overflow-y: auto; border: 1px solid #222; }
+    .bill-box { background: #111; padding: 15px; border-radius: 12px; border-top: 4px solid #f59e0b; }
+    .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .calc-field { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-top: 5px; border: 1px solid #333; }
+    .calc-field select, .calc-field input { background: transparent; color: #fff; border: none; outline: none; width: 45%; }
+    .total-banner { background: #f59e0b; color: #000; padding: 15px; border-radius: 10px; text-align: center; font-size: 24px; font-weight: 900; margin-top: 15px; }
+    .search-bar { width: 100%; padding: 10px; border-radius: 8px; background: #222; border: 1px solid #444; color: #fff; margin-bottom: 10px; }
   `;
 
   return (
-    <div className="sales-container">
+    <div className="pos-grid">
       <style>{styles}</style>
-      <div className="item-list">
-        <h3 style={{color: '#f59e0b'}}>SELECT PRODUCTS</h3>
-        <input type="text" className="search-input" placeholder="Search Item..." onChange={(e) => setSearchTerm(e.target.value)} />
+      
+      {/* Search & Warehouse Selection */}
+      <div className="item-box">
+        <div className="input-row">
+          <input type="text" className="search-bar" placeholder="Search Product..." onChange={e => setSearchTerm(e.target.value)} />
+          <select className="search-bar" onChange={e => setSelectedWarehouse(e.target.value)}>
+            <option value="All">All Warehouses</option>
+            {[...new Set(items.map(i => i.warehouse))].map(wh => <option key={wh} value={wh}>{wh}</option>)}
+          </select>
+        </div>
+        
         {filteredItems.map(item => (
-          <div className="product-row" key={item.id} onClick={() => addToCart(item)}>
-            <div>
-              <div style={{fontWeight:'bold'}}>{item.name}</div>
-              <small style={{color:'#888'}}>Stock: {item.totalPcs} Pcs</small>
-            </div>
-            <div style={{fontWeight:'bold'}}>Rs. {item.retailPrice}</div>
+          <div key={item.id} className="calc-field" style={{cursor:'pointer'}} onClick={() => addToCart(item)}>
+            <div style={{fontWeight:'bold'}}>{item.name} <small style={{color:'#f59e0b'}}>({item.warehouse})</small></div>
+            <div style={{fontSize:'12px', color:'#888'}}>Stock: {item.totalPcs} | Rs. {item.retailPrice}</div>
           </div>
         ))}
       </div>
 
-      <div className="cart-panel">
-        <h3 style={{color: '#10b981', margin:'0 0 20px 0'}}>INVOICE</h3>
-        <input type="text" className="search-input" placeholder="Customer Name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
-        <div style={{maxHeight:'40vh', overflowY:'auto'}}>
-          <table className="cart-table">
-            <thead>
-              <tr><th>Item</th><th>Qty</th><th>Total</th><th></th></tr>
-            </thead>
+      {/* Advanced Billing */}
+      <div className="bill-box">
+        <input type="text" className="search-bar" placeholder="Customer Name" value={customerName} onChange={e => setCustomerName(e.target.value)} />
+        
+        <div style={{maxHeight:'200px', overflowY:'auto', borderBottom:'1px solid #222', marginBottom:'10px'}}>
+          <table width="100%" style={{fontSize:'13px'}}>
+            <thead><tr style={{color:'#f59e0b'}}><th>Item</th><th>Qty</th><th>Total</th></tr></thead>
             <tbody>
               {cart.map(c => (
-                <tr key={c.id}>
-                  <td>{c.name}</td>
-                  <td><input type="number" className="qty-input" value={c.quantity} onChange={(e) => updateCartQty(c.id, e.target.value)} /></td>
-                  <td>{(c.quantity * c.salePrice).toLocaleString()}</td>
-                  <td><button onClick={() => removeFromCart(c.id)} style={{background:'none', border:'none', color:'#ef4444', cursor:'pointer'}}>X</button></td>
-                </tr>
+                <tr key={c.id}><td>{c.name}</td><td>{c.quantity}</td><td>{c.quantity * c.salePrice}</td></tr>
               ))}
             </tbody>
           </table>
         </div>
-        <div style={{marginTop:'20px', borderTop:'2px solid #222', paddingTop:'20px'}}>
-          <div style={{display:'flex', justifyContent:'space-between', fontSize:'22px', fontWeight:'900'}}>
-            <span>TOTAL:</span>
-            <span style={{color: '#10b981'}}>Rs. {calculateTotal().toLocaleString()}</span>
+
+        {/* Adjustments */}
+        <div className="input-row">
+          <div className="calc-field">
+            <span style={{fontSize:'10px'}}>DISCOUNT</span><br/>
+            <select onChange={e => setDiscount({...discount, type: e.target.value})}><option value="cash">Rs</option><option value="percent">%</option></select>
+            <input type="number" placeholder="0" onChange={e => setDiscount({...discount, val: e.target.value})} />
           </div>
-          <button className="checkout-btn" onClick={handleSale} disabled={loading || cart.length === 0}>
-            {loading ? "SAVING..." : "FINALIZE SALE"}
-          </button>
+          <div className="calc-field">
+            <span style={{fontSize:'10px'}}>RENT / FREIGHT</span><br/>
+            <select onChange={e => setRent({...rent, type: e.target.value})}><option value="cash">Rs</option><option value="percent">%</option></select>
+            <input type="number" placeholder="0" onChange={e => setRent({...rent, val: e.target.value})} />
+          </div>
         </div>
+
+        <div className="input-row">
+          <div className="calc-field">
+            <span style={{fontSize:'10px'}}>LOADING</span><br/>
+            <select onChange={e => setLoading({...loading, type: e.target.value})}><option value="cash">Rs</option><option value="percent">%</option></select>
+            <input type="number" placeholder="0" onChange={e => setLoading({...loading, val: e.target.value})} />
+          </div>
+          <div className="calc-field">
+            <span style={{fontSize:'10px'}}>UNLOADING</span><br/>
+            <select onChange={e => setUnloading({...unloading, type: e.target.value})}><option value="cash">Rs</option><option value="percent">%</option></select>
+            <input type="number" placeholder="0" onChange={e => setUnloading({...unloading, val: e.target.value})} />
+          </div>
+        </div>
+
+        <div className="calc-field">
+          <span style={{fontSize:'10px'}}>EXTRA CHARGES / MISC</span>
+          <input style={{width:'100%'}} type="number" placeholder="Enter amount" onChange={e => setExtraCharges(e.target.value)} />
+        </div>
+
+        {/* Payment Split */}
+        <div className="input-row" style={{marginTop:'10px'}}>
+          <select className="search-bar" onChange={e => setPaymentType(e.target.value)}>
+            <option value="cash">Full Cash</option>
+            <option value="credit">Full Credit (Udhaar)</option>
+            <option value="partial">Partial (Some Cash + Credit)</option>
+          </select>
+          {paymentType === 'partial' && <input type="number" className="search-bar" placeholder="Paid Amount" onChange={e => setPaidAmount(e.target.value)} />}
+        </div>
+
+        <div className="total-banner">
+          <div style={{fontSize:'12px', fontWeight:'normal'}}>Net Payable Amount</div>
+          Rs. {finalAmount.toLocaleString()}
+        </div>
+
+        <button className="checkout-btn" style={{width:'100%', padding:'15px', marginTop:'10px', background:'#10b981', fontWeight:'bold', cursor:'pointer'}} onClick={handleSale}>
+          FINALIZE SALE & PRINT
+        </button>
       </div>
     </div>
   );

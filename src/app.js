@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 
-// --- FIXED IMPORTS (Matching your exact folder and file names) ---
-import AddItem from './components/additem';             // small letters
-import InventoryView from './components/inventoryview';   // small letters
-import DashboardSummary from './components/DashboardSummary'; // Capital as you said
-import SalesModule from './components/salesmodule';       // changed to small as per your file details
-import SalesHistory from './components/SalesHistory';     // Capital as you said
-import Reports from './components/Reports';               // Capital as you said
-import ExpenseTracker from './components/ExpenseTracker'; // Capital as you said
+// --- FIXED IMPORTS: Exact naming matching for Vercel ---
+import AddItem from './components/additem';
+import InventoryView from './components/inventoryview';
+import DashboardSummary from './components/DashboardSummary';
+import SalesModule from './components/SalesModule'; // S aur M capital rakha hai jaisa aapke working code mein tha
+import SalesHistory from './components/SalesHistory';
+import Reports from './components/Reports'; 
+import ExpenseTracker from './components/ExpenseTracker';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -68,8 +68,8 @@ function App() {
 
       <nav className="sidebar">
         <div className="logo-area">
-          <div className="logo-text">PREMIUM CERAMICS</div>
-          <small style={{color:'#444'}}>v2.0 Beta</small>
+          <div className="logo-text">PREMIUM IMS</div>
+          <small style={{color:'#444'}}>v2.1 Stable</small>
         </div>
         {menuItems.map(item => (
           <div 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
 
 const DashboardSummary = () => {
   const [items, setItems] = useState([]);
@@ -8,155 +8,161 @@ const DashboardSummary = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubInventory = onSnapshot(collection(db, "inventory_records"), (snapshot) => {
-      setItems(snapshot.docs.map(doc => doc.data()));
+    const unsubInv = onSnapshot(collection(db, "inventory_records"), (snap) => {
+      setItems(snap.docs.map(doc => doc.data()));
     });
-    const unsubSales = onSnapshot(query(collection(db, "sales_records"), orderBy("createdAt", "desc")), (snapshot) => {
-      setSales(snapshot.docs.map(doc => doc.data()));
+    const unsubSales = onSnapshot(query(collection(db, "sales_records"), orderBy("createdAt", "desc"), limit(10)), (snap) => {
+      setSales(snap.docs.map(doc => doc.data()));
       setLoading(false);
     });
-    return () => { unsubInventory(); unsubSales(); };
+    return () => { unsubInv(); unsubSales(); };
   }, []);
 
-  // Stats Logic
-  const totalRevenue = sales.reduce((a, s) => a + (parseFloat(s.totalAmount) || 0), 0);
-  const totalStockVal = items.reduce((a, c) => a + ((parseFloat(c.purchasePrice) || 0) * (parseFloat(c.totalPcs) || 0)), 0);
-  const totalSalesCount = sales.length;
+  const totalRevenue = sales.reduce((a, s) => a + (s.totalAmount || 0), 0);
+  const totalStock = items.reduce((a, c) => a + (parseFloat(c.totalPcs) || 0), 0);
 
   const styles = `
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&display=swap');
     
-    .dash-wrapper { 
-      padding: 30px; background: #000; min-height: 100vh; 
+    .dash-container { 
+      padding: 30px; background: #050505; min-height: 100vh; 
       font-family: 'Outfit', sans-serif; color: #fff;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: auto auto auto;
+      gap: 20px;
     }
 
-    .header-section { margin-bottom: 40px; }
-    .gold-text { 
-      color: #D4AF37; font-weight: 900; letter-spacing: 2px; 
-      text-shadow: 0 0 15px rgba(212, 175, 55, 0.4); 
-    }
-
-    /* Glowing Stats Grid */
-    .stats-grid { 
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
-      gap: 25px; margin-bottom: 40px; 
-    }
-
-    .glow-card {
-      background: linear-gradient(145deg, #0f0f0f, #050505);
+    /* Reference Image Style - Grid Spanning */
+    .header-box { grid-column: span 4; display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; }
+    
+    .main-chart-box { 
+      grid-column: span 2; grid-row: span 2; 
+      background: linear-gradient(145deg, #111, #000);
       border: 1px solid rgba(212, 175, 55, 0.2);
-      padding: 30px; border-radius: 25px; position: relative;
-      overflow: hidden; transition: 0.4s ease;
-    }
-    .glow-card:hover {
-      transform: translateY(-10px);
-      border-color: #D4AF37;
-      box-shadow: 0 15px 35px rgba(212, 175, 55, 0.15);
-    }
-    .glow-card::after {
-      content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
-      background: radial-gradient(circle, rgba(212, 175, 55, 0.05) 0%, transparent 70%);
-      pointer-events: none;
+      border-radius: 30px; padding: 30px;
+      position: relative; overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     }
 
-    .stat-label { color: #888; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
-    .stat-value { 
-      display: block; font-size: 32px; font-weight: 900; margin-top: 10px; 
-      background: linear-gradient(to right, #D4AF37, #F9E2AF);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    .stat-small-box { 
+      grid-column: span 1; 
+      background: #111; border-radius: 25px; padding: 25px;
+      border: 1px solid #222; transition: 0.3s;
+    }
+    .stat-small-box:hover { border-color: #D4AF37; transform: translateY(-5px); }
+
+    .activity-box { 
+      grid-column: span 2; 
+      background: #0a0a0a; border-radius: 30px; padding: 25px;
+      border: 1px solid #1a1a1a;
     }
 
-    /* Info Panels */
-    .info-row { display: grid; grid-template-columns: 1.5fr 1fr; gap: 25px; }
-    .glass-panel {
-      background: rgba(15, 15, 15, 0.8); border: 1px solid #222;
-      padding: 25px; border-radius: 30px; backdrop-filter: blur(10px);
-    }
-    .panel-title { 
-      font-size: 18px; font-weight: 600; color: #D4AF37; 
-      margin-bottom: 20px; display: flex; align-items: center; gap: 10px;
+    /* Glowing Elements */
+    .gold-glow-text {
+      color: #D4AF37; font-weight: 900; 
+      text-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
     }
 
-    .transaction-item {
-      display: flex; justify-content: space-between; padding: 15px 0;
-      border-bottom: 1px solid #1a1a1a; transition: 0.3s;
-    }
-    .transaction-item:hover { padding-left: 10px; color: #D4AF37; }
-
-    .tag-gold {
-      background: rgba(212, 175, 55, 0.1); color: #D4AF37;
-      padding: 4px 12px; border-radius: 50px; font-size: 11px; font-weight: bold; border: 1px solid #D4AF37;
+    .circle-progress {
+      width: 120px; height: 120px; border-radius: 50%;
+      border: 8px solid #1a1a1a; border-top: 8px solid #D4AF37;
+      display: flex; align-items: center; justify-content: center;
+      margin: 20px auto; box-shadow: 0 0 15px rgba(212, 175, 55, 0.2);
     }
 
-    .progress-track {
-      width: 100%; height: 6px; background: #1a1a1a; border-radius: 10px; margin-top: 8px;
+    .list-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 15px; background: rgba(255,255,255,0.03);
+      border-radius: 15px; margin-bottom: 10px; border: 1px solid transparent;
     }
-    .progress-fill {
-      height: 100%; background: #D4AF37; border-radius: 10px;
-      box-shadow: 0 0 10px #D4AF37;
+    .list-item:hover { border-color: rgba(212, 175, 55, 0.4); background: rgba(212, 175, 55, 0.05); }
+
+    .btn-gold {
+      background: #D4AF37; color: #000; border: none; padding: 10px 20px;
+      border-radius: 12px; font-weight: bold; cursor: pointer;
     }
+
+    .mini-label { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
   `;
 
-  if (loading) return <div style={{background:'#000', color:'#D4AF37', height:'100vh', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'20px', fontWeight:'900'}}>INITIALIZING LUXURY SUITE...</div>;
+  if (loading) return <div style={{background:'#000', color:'#D4AF37', textAlign:'center', paddingTop:'20%'}}>Loading Premium Dashboard...</div>;
 
   return (
-    <div className="dash-wrapper">
+    <div className="dash-container">
       <style>{styles}</style>
       
-      <div className="header-section">
-        <h1 className="gold-text" style={{margin:0}}>SYSTEM OVERVIEW</h1>
-        <p style={{color:'#555', fontSize:'14px'}}>Welcome back, Admin. Here is your business at a glance.</p>
+      {/* 1. Header Area */}
+      <div className="header-box">
+        <div>
+          <h1 style={{margin:0, fontSize:'28px'}} className="gold-glow-text">DASHBOARD</h1>
+          <p style={{color:'#444', margin:0}}>Real-time business performance analytics</p>
+        </div>
+        <button className="btn-gold">+ Generate Report</button>
       </div>
 
-      <div className="stats-grid">
-        <div className="glow-card">
-          <span className="stat-label">Total Revenue</span>
-          <span className="stat-value">Rs. {totalRevenue.toLocaleString()}</span>
-          <div className="progress-track"><div className="progress-fill" style={{width: '75%'}}></div></div>
+      {/* 2. Main Analytics Box (Inspired by the big chart in your image) */}
+      <div className="main-chart-box">
+        <span className="mini-label">Sales Revenue Performance</span>
+        <h2 style={{fontSize:'42px', margin:'10px 0'}} className="gold-glow-text">Rs. {totalRevenue.toLocaleString()}</h2>
+        <div style={{color:'#3fb950', fontSize:'14px'}}>▲ 12.5% since last month</div>
+        
+        <div className="circle-progress">
+          <div style={{textAlign:'center'}}>
+            <div style={{fontSize:'24px', fontWeight:'900'}}>75%</div>
+            <div style={{fontSize:'10px', color:'#555'}}>TARGET</div>
+          </div>
         </div>
-        <div className="glow-card">
-          <span className="stat-label">Stock Inventory Value</span>
-          <span className="stat-value">Rs. {totalStockVal.toLocaleString()}</span>
-          <div className="progress-track"><div className="progress-fill" style={{width: '60%'}}></div></div>
-        </div>
-        <div className="glow-card">
-          <span className="stat-label">Active Sales</span>
-          <span className="stat-value">{totalSalesCount} <small style={{fontSize:'12px', color:'#555', WebkitTextFillColor:'#555'}}>Invoices</small></span>
-          <div className="progress-track"><div className="progress-fill" style={{width: '45%'}}></div></div>
+        
+        <div style={{marginTop:'30px'}}>
+          <div style={{display:'flex', justifyContent:'space-between', marginBottom:'10px'}}>
+            <span>Efficiency</span>
+            <span style={{color:'#D4AF37'}}>92%</span>
+          </div>
+          <div style={{width:'100%', height:'8px', background:'#222', borderRadius:'10px'}}>
+            <div style={{width:'92%', height:'100%', background:'#D4AF37', borderRadius:'10px', boxShadow:'0 0 10px #D4AF37'}}></div>
+          </div>
         </div>
       </div>
 
-      <div className="info-row">
-        <div className="glass-panel">
-          <div className="panel-title"><span>📜</span> Recent Transactions</div>
-          {sales.slice(0, 5).map((s, i) => (
-            <div className="transaction-item" key={i}>
-              <div>
-                <div style={{fontWeight:600}}>{s.customerName}</div>
-                <small style={{color:'#444'}}>{s.createdAt?.toDate().toLocaleDateString()}</small>
-              </div>
-              <div style={{textAlign:'right'}}>
-                <div style={{fontWeight:900, color:'#D4AF37'}}>+ Rs. {s.totalAmount?.toLocaleString()}</div>
-                <span className="tag-gold">SUCCESS</span>
-              </div>
+      {/* 3. Small Stat Boxes */}
+      <div className="stat-small-box">
+        <span className="mini-label">Total Stock</span>
+        <h3 style={{fontSize:'24px', margin:'10px 0'}}>{totalStock.toLocaleString()} Pcs</h3>
+        <div style={{color:'#888', fontSize:'12px'}}>Available in 3 Warehouses</div>
+      </div>
+
+      <div className="stat-small-box">
+        <span className="mini-label">Total Orders</span>
+        <h3 style={{fontSize:'24px', margin:'10px 0'}}>{sales.length}</h3>
+        <div style={{color:'#888', fontSize:'12px'}}>Completed Invoices</div>
+      </div>
+
+      {/* 4. Activity / Recent Sales (Side Panel style) */}
+      <div className="activity-box">
+        <h4 style={{margin:'0 0 20px 0', color:'#D4AF37'}}>RECENT ACTIVITY</h4>
+        {sales.slice(0, 4).map((sale, i) => (
+          <div className="list-item" key={i}>
+            <div>
+              <div style={{fontWeight:600, fontSize:'14px'}}>{sale.customerName}</div>
+              <small style={{color:'#555'}}>{new Date().toLocaleTimeString()}</small>
             </div>
-          ))}
-        </div>
-
-        <div className="glass-panel">
-          <div className="panel-title"><span>⚠️</span> Low Stock Alerts</div>
-          {items.filter(item => (parseFloat(item.openingStock) || 0) < 10).slice(0, 5).map((item, i) => (
-            <div className="transaction-item" key={i}>
-              <div style={{color: '#888'}}>{item.name}</div>
-              <div style={{color: '#ef4444', fontWeight:'bold'}}>{item.openingStock} Boxes</div>
-            </div>
-          ))}
-          {items.filter(item => (parseFloat(item.openingStock) || 0) < 10).length === 0 && 
-            <div style={{textAlign:'center', color:'#555', marginTop:'40px'}}>Inventory Health: Excellent</div>
-          }
-        </div>
+            <div style={{color:'#D4AF37', fontWeight:'900'}}>Rs. {sale.totalAmount}</div>
+          </div>
+        ))}
       </div>
+
+      {/* 5. Inventory Alert Box */}
+      <div className="activity-box">
+        <h4 style={{margin:'0 0 20px 0', color:'#D4AF37'}}>INVENTORY ALERTS</h4>
+        {items.filter(item => (parseFloat(item.openingStock) || 0) < 10).slice(0, 4).map((item, i) => (
+          <div className="list-item" key={i} style={{borderColor: 'rgba(239, 68, 68, 0.2)'}}>
+            <span style={{fontSize:'14px'}}>{item.name}</span>
+            <span style={{color:'#ef4444', fontWeight:'bold'}}>{item.openingStock} Left</span>
+          </div>
+        ))}
+      </div>
+
     </div>
   );
 };

@@ -31,14 +31,13 @@ const AddItem = ({ editData, onComplete }) => {
     else { setFormData(initialFormState); }
   }, [editData]);
 
-  // Logic for Totals, Barcode and QR update
   useEffect(() => {
     const stock = parseFloat(formData.openingStock) || 0;
     const pcsBox = parseFloat(formData.pcsPerBox) || 0;
     const weightVal = parseFloat(formData.weightKg) || 0;
 
     const totalPcsCalc = stock * pcsBox;
-    const totalWeightCalc = (stock * weightVal).toFixed(2); // Opening Stock * Weight
+    const totalWeightCalc = (stock * weightVal).toFixed(2);
 
     const nameUpper = (formData.name || '').toUpperCase();
     const L = formData.length || '0';
@@ -62,26 +61,29 @@ const AddItem = ({ editData, onComplete }) => {
     .add-item-container { background-color: #000; min-height: 100vh; padding: 20px; font-family: 'Segoe UI', sans-serif; color: #fff; }
     .layout-grid { display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 25px; max-width: 1200px; margin: 0 auto; }
     
-    .form-card { background-color: #111; padding: 30px; border-radius: 30px; border: 1px solid #222; display: flex; flex-direction: column; align-items: center; }
-    .form-inner-container { width: 60%; display: flex; flex-direction: column; }
+    /* Adjusted form-card size to be slightly larger than input fields */
+    .form-card { background-color: #111; padding: 20px; border-radius: 30px; border: 1px solid #222; display: flex; flex-direction: column; align-items: center; width: fit-content; margin: 0 auto; }
+    
+    /* Inner container width adjusted for better fit */
+    .form-inner-container { width: 500px; display: flex; flex-direction: column; padding: 10px; }
     
     .preview-card { background-color: #111; padding: 25px; border-radius: 30px; border: 1px solid #222; text-align: center; position: sticky; top: 20px; height: fit-content; }
     
-    .input-group-row { display: flex; gap: 15px; width: 100%; margin-bottom: 20px; }
-    .input-group-single { width: 100%; margin-bottom: 20px; }
+    .input-group-row { display: flex; gap: 15px; width: 100%; margin-bottom: 15px; }
+    .input-group-single { width: 100%; margin-bottom: 15px; }
+    
+    /* 1.5x larger fields for dropdowns */
+    .flex-1-5 { flex: 1.5; }
     .flex-1 { flex: 1; }
     
-    .label-text { display: block; color: #9ca3af; font-size: 11px; margin-bottom: 8px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; }
-    .custom-input { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #333; background-color: #fff; color: #000; font-size: 15px; outline: none; box-sizing: border-box; }
-    .readonly-input { width: 100%; padding: 14px; border-radius: 12px; border: none; background-color: #1a1a1a; color: #f59e0b; font-size: 14px; font-weight: bold; box-sizing: border-box; }
+    .label-text { display: block; color: #9ca3af; font-size: 11px; margin-bottom: 6px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; }
+    .custom-input { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #333; background-color: #fff; color: #000; font-size: 14px; outline: none; box-sizing: border-box; }
+    .readonly-input { width: 100%; padding: 12px; border-radius: 10px; border: none; background-color: #1a1a1a; color: #f59e0b; font-size: 13px; font-weight: bold; box-sizing: border-box; }
     
-    .btn-plus { background-color: #f59e0b; color: #000; width: 55px; height: 48px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; margin-left: 5px; font-size: 24px; display: flex; align-items: center; justify-content: center; }
-    .btn-main { background-color: #f59e0b; color: #000; width: 100%; padding: 20px; border-radius: 20px; border: none; font-weight: 900; cursor: pointer; margin-top: 25px; text-transform: uppercase; font-size: 16px; }
-    .btn-top { background-color: #f59e0b; color: #000; border: none; border-radius: 10px; padding: 8px 15px; font-weight: bold; cursor: pointer; font-size: 11px; flex: 1; }
+    .btn-plus { background-color: #f59e0b; color: #000; width: 45px; height: 42px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-left: 5px; font-size: 20px; display: flex; align-items: center; justify-content: center; }
+    .btn-main { background-color: #f59e0b; color: #000; width: 100%; padding: 18px; border-radius: 15px; border: none; font-weight: 900; cursor: pointer; margin-top: 20px; text-transform: uppercase; font-size: 15px; }
+    .btn-top { background-color: #f59e0b; color: #000; border: none; border-radius: 8px; padding: 8px 12px; font-weight: bold; cursor: pointer; font-size: 10px; flex: 1; }
     
-    .preview-data-box { text-align: left; background: #000; padding: 12px; border-radius: 15px; margin-top: 10px; border: 1px solid #222; }
-    .qr-preview-box { border: 2px solid #fff !important; }
-
     @media (max-width: 900px) { .layout-grid { grid-template-columns: 1fr; } .form-inner-container { width: 100%; } }
   `;
 
@@ -101,24 +103,19 @@ const AddItem = ({ editData, onComplete }) => {
           const newDocRef = doc(collection(db, "inventory_records"));
           const sr = `SR-${Math.floor(1000 + Math.random() * 9000)}`;
           const name = (item["Item Name"] || "UNKNOWN").toUpperCase();
-          const sku = `${name.substring(0, 3)}-${sr}`;
           const openStock = parseFloat(item["Opening Stock"]) || 0;
-          const pcsBox = parseFloat(item["Pcs Per Box"]) || 0;
           const wt = parseFloat(item["Weight KG"]) || 0;
           
           batch.set(newDocRef, {
-            name, srNo: sr, sku,
+            name, srNo: sr, sku: `${name.substring(0, 3)}-${sr}`,
             company: (item["Company"] || "GENERIC").toUpperCase(),
             category: (item["Category"] || "GENERAL").toUpperCase(),
             subCategory: (item["Sub-Category"] || "STANDARD").toUpperCase(),
             warehouse: (item["Warehouse"] || "MAIN STORE").toUpperCase(),
-            pcsPerBox: pcsBox,
+            pcsPerBox: parseFloat(item["Pcs Per Box"]) || 0,
             openingStock: openStock,
-            totalPcs: openStock * pcsBox,
+            totalPcs: openStock * (parseFloat(item["Pcs Per Box"]) || 0),
             totalWeight: (openStock * wt).toFixed(2),
-            length: item["Length"] || '0',
-            width: item["Width"] || '0',
-            height: item["Height"] || '0',
             weightKg: wt,
             purchasePrice: item["Purchase Price"] || 0,
             tradePrice: item["Trade Price"] || 0,
@@ -153,7 +150,7 @@ const AddItem = ({ editData, onComplete }) => {
   return (
     <div className="add-item-container">
       <style>{styles}</style>
-      <h2 style={{ fontStyle: 'italic', fontWeight: '900', color: '#f59e0b', textAlign:'center', marginBottom: '30px' }}>PRODUCT REGISTRATION</h2>
+      <h2 style={{ fontStyle: 'italic', fontWeight: '900', color: '#f59e0b', textAlign:'center', marginBottom: '20px' }}>PRODUCT REGISTRATION</h2>
       <div className="layout-grid">
         <div className="form-card">
           <div className="form-inner-container">
@@ -161,31 +158,29 @@ const AddItem = ({ editData, onComplete }) => {
               <div className="input-group-single"><label className="label-text">Item Name *</label><input className="custom-input" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})} required /></div>
               
               <div className="input-group-row">
-                <div className="flex-1"><label className="label-text">Company *</label>
+                <div className="flex-1-5"><label className="label-text">Company *</label>
                   <div style={{display:'flex'}}><select className="custom-input" value={formData.company} onChange={e=>setFormData({...formData, company: e.target.value})} required><option value="">Select</option>{companies.map(c=><option key={c} value={c}>{c}</option>)}</select><button type="button" onClick={()=>setCompanies([...companies, prompt("New Company")?.toUpperCase()])} className="btn-plus">+</button></div>
                 </div>
-                <div className="flex-1"><label className="label-text">Category *</label>
+                <div className="flex-1-5"><label className="label-text">Category *</label>
                   <div style={{display:'flex'}}><select className="custom-input" value={formData.category} onChange={e=>setFormData({...formData, category: e.target.value})} required><option value="">Select</option>{categories.map(c=><option key={c} value={c}>{c}</option>)}</select><button type="button" onClick={()=>setCategories([...categories, prompt("New Category")?.toUpperCase()])} className="btn-plus">+</button></div>
                 </div>
               </div>
 
               <div className="input-group-row">
-                <div className="flex-1"><label className="label-text">Sub-Category *</label>
+                <div className="flex-1-5"><label className="label-text">Sub-Category *</label>
                   <div style={{display:'flex'}}><select className="custom-input" value={formData.subCategory} onChange={e=>setFormData({...formData, subCategory: e.target.value})} required><option value="">Select</option>{subCategories.map(c=><option key={c} value={c}>{c}</option>)}</select><button type="button" onClick={()=>setSubCategories([...subCategories, prompt("New Sub-Category")?.toUpperCase()])} className="btn-plus">+</button></div>
                 </div>
-                <div className="flex-1"><label className="label-text">Warehouse *</label>
+                <div className="flex-1-5"><label className="label-text">Warehouse *</label>
                   <div style={{display:'flex'}}><select className="custom-input" value={formData.warehouse} onChange={e=>setFormData({...formData, warehouse: e.target.value})} required><option value="">Select</option>{warehouses.map(w=><option key={w} value={w}>{w}</option>)}</select><button type="button" onClick={()=>setWarehouses([...warehouses, prompt("New Warehouse")?.toUpperCase()])} className="btn-plus">+</button></div>
                 </div>
               </div>
 
-              {/* Opening Stock, Pcs Per Box, Weight KG in one line */}
               <div className="input-group-row">
                 <div className="flex-1"><label className="label-text">Opening Stock</label><input type="number" className="custom-input" value={formData.openingStock} onChange={e=>setFormData({...formData, openingStock: e.target.value})} /></div>
                 <div className="flex-1"><label className="label-text">Pcs Per Box *</label><input type="number" className="custom-input" value={formData.pcsPerBox} onChange={e=>setFormData({...formData, pcsPerBox: e.target.value})} required /></div>
                 <div className="flex-1"><label className="label-text">Weight (KG)</label><input type="number" step="0.01" className="custom-input" value={formData.weightKg} onChange={e=>setFormData({...formData, weightKg: e.target.value})} /></div>
               </div>
 
-              {/* Total PCS and Total Weight in one line */}
               <div className="input-group-row">
                 <div className="flex-1"><label className="label-text">Total PCS (Auto)</label><input className="readonly-input" value={formData.totalPcs} readOnly /></div>
                 <div className="flex-1"><label className="label-text">Total Weight (KG)</label><input className="readonly-input" value={formData.totalWeight} readOnly /></div>
@@ -212,27 +207,22 @@ const AddItem = ({ editData, onComplete }) => {
 
         <div className="preview-card">
           <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-            <button type="button" className="btn-top" onClick={() => {/* Template Download Logic */}}>Template</button>
+            <button type="button" className="btn-top" onClick={() => {/* Template Logic */}}>Template</button>
             <button type="button" className="btn-top" onClick={() => excelInputRef.current.click()}>Excel Import</button>
           </div>
-
           <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
             <div className="flex-1"><label className="label-text">SR #</label><input className="readonly-input" style={{textAlign:'center'}} value={formData.srNo} readOnly /></div>
             <div className="flex-1"><label className="label-text">SKU</label><input className="readonly-input" style={{textAlign:'center'}} value={formData.sku} readOnly /></div>
           </div>
-
           <div onClick={() => fileInputRef.current.click()} style={{ width: '100%', aspectRatio: '1/1', backgroundColor: '#1a1a1a', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', border: '1px solid #333', marginBottom: '20px' }}>
-            {formData.imageUrl ? <img src={formData.imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Product" /> : <span style={{ color: '#444' }}>IMAGE</span>}
+            {formData.imageUrl ? <img src={formData.imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="P" /> : <span style={{ color: '#444' }}>IMAGE</span>}
           </div>
-          
           <h3 style={{ fontStyle: 'italic', margin: '15px 0' }}>{formData.name || "PRODUCT NAME"}</h3>
-          
           <div className="preview-data-box">
             <label className="label-text" style={{color: '#f59e0b'}}>Barcode Data</label>
             <div style={{fontSize:'10px', wordBreak: 'break-all'}}>{formData.barcodeData}</div>
           </div>
-          
-          <div className="preview-data-box qr-preview-box">
+          <div className="preview-data-box" style={{border:'2px solid #fff'}}>
             <label className="label-text" style={{color: '#f59e0b'}}>QR Data</label>
             <div style={{fontSize:'10px', color:'#888', wordBreak: 'break-all'}}>{formData.qrCodeData}</div>
           </div>

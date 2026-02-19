@@ -218,7 +218,7 @@ const AddItem = ({ editData, onComplete }) => {
             {formData.imageUrl ? <img src={formData.imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="P" /> : <span style={{ color: '#444' }}>IMAGE</span>}
           </div>
           <h3 style={{ fontStyle: 'italic', margin: '15px 0' }}>{formData.name || "PRODUCT NAME"}</h3>
-          <div className="preview-data-box">
+          <div className="preview-data-box" style={{border:'2px solid #fff'}}>
             <label className="label-text" style={{color: '#f59e0b'}}>Barcode Data</label>
             <div style={{fontSize:'10px', wordBreak: 'break-all'}}>{formData.barcodeData}</div>
           </div>
@@ -239,3 +239,4 @@ const AddItem = ({ editData, onComplete }) => {
 };
 
 export default AddItem;
+

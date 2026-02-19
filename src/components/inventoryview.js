@@ -20,20 +20,10 @@ const InventoryView = ({ onEdit }) => {
   }, []);
 
   const handleDelete = async (e, id) => {
-    e.stopPropagation(); // Prevents triggering other clicks
+    e.stopPropagation();
     if (window.confirm("Are you sure you want to delete this item?")) {
       try { await deleteDoc(doc(db, "inventory_records", id)); } 
       catch (err) { alert("Error deleting: " + err.message); }
-    }
-  };
-
-  const handleEditClick = (e, item) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (onEdit) {
-      onEdit(item); // Calling the prop function passed from App.js
-    } else {
-      console.error("onEdit function is not passed to InventoryView");
     }
   };
 
@@ -48,15 +38,21 @@ const InventoryView = ({ onEdit }) => {
     const img = new Image();
     
     img.onload = () => {
-      // High Quality but Controlled Physical Size (5x scaling for clarity only)
-      const qualityScale = 5; 
-      canvas.width = img.width * qualityScale;
-      canvas.height = img.height * qualityScale;
+      // 2-Inch Size Control (High Quality)
+      // Standard 300 DPI for 2 inches is 600px
+      const targetWidth = type === 'bc' ? 600 : 400; 
+      const aspectRatio = img.height / img.width;
       
+      canvas.width = targetWidth;
+      canvas.height = targetWidth * aspectRatio;
+
+      // Fill White Background & Border
       ctx.fillStyle = "white";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.scale(qualityScale, qualityScale);
-      ctx.drawImage(img, 0, 0);
+      
+      // QR Border logic (Padding)
+      const padding = type === 'qr' ? 40 : 10;
+      ctx.drawImage(img, padding, padding, canvas.width - (padding * 2), canvas.height - (padding * 2));
       
       const pngFile = canvas.toDataURL("image/png", 1.0);
       const downloadLink = document.createElement("a");
@@ -72,8 +68,6 @@ const InventoryView = ({ onEdit }) => {
     item.sku?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const totalTP = items.reduce((acc, curr) => acc + (parseFloat(curr.tradePrice) * parseFloat(curr.totalPcs) || 0), 0);
-
   const styles = `
     .inventory-container { background-color: #000; min-height: 100vh; padding: 20px; color: #fff; font-family: 'Segoe UI', sans-serif; }
     .header-section { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
@@ -87,15 +81,15 @@ const InventoryView = ({ onEdit }) => {
     .label-clickable { 
       background: #fff; padding: 5px; border-radius: 4px; display: flex; 
       align-items: center; justify-content: center; cursor: pointer; 
-      border: 3px solid #fff; /* White Border */
+      border: 3px solid #fff; 
     }
 
     .action-btn { 
       padding: 15px 25px; border-radius: 12px; border: none; cursor: pointer; 
       font-weight: 900; font-size: 16px; text-transform: uppercase;
-      display: inline-block; vertical-align: middle;
+      position: relative; z-index: 10; /* Ensures button is clickable */
     }
-    .edit-btn { background: #f59e0b; color: #000; margin-right: 15px; width: 120px; pointer-events: auto !important; }
+    .edit-btn { background: #f59e0b; color: #000; margin-right: 15px; width: 120px; }
     .delete-btn { background: #ef4444; color: #fff; width: 120px; }
     
     .stat-card { background: #111; padding: 15px; border-radius: 15px; border: 1px solid #222; text-align: center; }
@@ -114,7 +108,7 @@ const InventoryView = ({ onEdit }) => {
         <div className="stat-card"><span className="stat-val">{items.length}</span><small>ITEMS</small></div>
         <div className="stat-card"><span className="stat-val">{items.reduce((a,c)=>a+(parseFloat(c.totalPcs)||0),0)}</span><small>TOTAL PCS</small></div>
         <div className="stat-card"><span className="stat-val">{items.reduce((a,c)=>a+(parseFloat(c.totalWeight)||0),0).toFixed(2)} KG</span><small>WEIGHT</small></div>
-        <div className="stat-card"><span className="stat-val">{totalTP.toLocaleString()}</span><small>VALUE (TP)</small></div>
+        <div className="stat-card"><span className="stat-val">{items.reduce((acc, curr) => acc + (parseFloat(curr.tradePrice) * parseFloat(curr.totalPcs) || 0), 0).toLocaleString()}</span><small>VALUE (TP)</small></div>
       </div>
 
       <div className="table-responsive">
@@ -131,9 +125,7 @@ const InventoryView = ({ onEdit }) => {
           </thead>
           <tbody>
             {filteredItems.map((item) => {
-              // Barcode: SR, PCS, Vol, Wt (No Purchase) - Size optimized for 2-inch
               const bCode = `SN:${item.srNo}|PCS:${item.pcsPerBox}|VOL:${item.length}x${item.width}x${item.height}|WT:${item.weightKg}`;
-              // QR: Name, WH, PCS/B
               const qCode = `ITEM:${item.name}|WH:${item.warehouse}|PCS/B:${item.pcsPerBox}`;
 
               return (
@@ -147,7 +139,7 @@ const InventoryView = ({ onEdit }) => {
                   <td>
                     <div style={{display:'flex', gap:'8px'}}>
                       <div className="label-clickable" onClick={(e) => downloadLabel(e, item.id, 'bc')}>
-                        <Barcode id={`bc-${item.id}`} value={bCode} width={0.7} height={30} fontSize={8} margin={0} />
+                        <Barcode id={`bc-${item.id}`} value={bCode} width={0.8} height={30} fontSize={8} margin={0} />
                       </div>
                       <div className="label-clickable" onClick={(e) => downloadLabel(e, item.id, 'qr')}>
                         <QRCodeSVG id={`qr-${item.id}`} value={qCode} size={45} level="H" />
@@ -157,23 +149,24 @@ const InventoryView = ({ onEdit }) => {
                   <td>
                     <div style={{fontWeight:'bold'}}>{item.openingStock} Boxes</div>
                     <div style={{fontSize:'12px'}}>{item.totalPcs} Pcs</div>
-                    <div style={{fontSize:'11px', color:'#888'}}>{item.weightKg}kg/Box | {item.totalWeight}kg Total</div>
                   </td>
                   <td>
                     <div style={{fontSize:'12px'}}>PUR: {item.purchasePrice}</div>
                     <div style={{fontSize:'12px'}}>TP: {item.tradePrice}</div>
                     <div style={{fontSize:'12px', color:'#f59e0b'}}>RP: {item.retailPrice}</div>
                   </td>
-                  <td style={{minWidth: '280px'}}>
+                  <td>
                     <button 
-                      type="button"
                       className="action-btn edit-btn" 
-                      onClick={(e) => handleEditClick(e, item)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onEdit(item);
+                      }}
                     >
                       EDIT
                     </button>
                     <button 
-                      type="button"
                       className="action-btn delete-btn" 
                       onClick={(e) => handleDelete(e, item.id)}
                     >

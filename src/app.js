@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
+// Components Import
 import InventoryView from './InventoryView';
 import SalesModule from './SalesModule';
-import Reports from './Reports'; // Reports import kiya
+import Reports from './Reports';
 
 function App() {
-  // Shuruat mein 'dashboard' ya 'sales' jo bhi aap rakhna chahen
+  // Shuruat mein konsi screen nazar aaye (Default: Sales)
   const [view, setView] = useState('sales');
 
   const navBtnStyle = (active) => ({
@@ -15,11 +16,12 @@ function App() {
     borderRadius: '8px',
     cursor: 'pointer',
     fontWeight: 'bold',
-    transition: '0.3s'
+    transition: '0.3s',
+    fontSize: '14px'
   });
 
   return (
-    <div style={{ background: '#000', minHeight: '100vh', color: '#fff' }}>
+    <div style={{ background: '#000', minHeight: '100vh', color: '#fff', fontFamily: 'Arial, sans-serif' }}>
       
       {/* NAVIGATION BAR */}
       <nav style={{ 
@@ -30,7 +32,8 @@ function App() {
         borderBottom: '1px solid #1a1a1a',
         position: 'sticky',
         top: 0,
-        zIndex: 100
+        zIndex: 100,
+        flexWrap: 'wrap' // Mobile support ke liye
       }}>
         <button 
           style={navBtnStyle(view === 'inventory')} 
@@ -53,11 +56,19 @@ function App() {
 
       {/* MAIN CONTENT AREA */}
       <div style={{ padding: '20px' }}>
+        {/* Switch Logic */}
         {view === 'inventory' && <InventoryView />}
         {view === 'sales' && <SalesModule />}
         {view === 'reports' && <Reports />}
       </div>
 
+      {/* Global CSS for Hover effects */}
+      <style>{`
+        button:hover {
+          opacity: 0.8;
+          border-color: #D4AF37 !important;
+        }
+      `}</style>
     </div>
   );
 }

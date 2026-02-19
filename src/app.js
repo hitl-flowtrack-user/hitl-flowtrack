@@ -4,6 +4,8 @@ import InventoryView from './components/inventoryview';
 import DashboardSummary from './components/DashboardSummary';
 import SalesModule from './components/SalesModule';
 import SalesHistory from './components/SalesHistory';
+import Reports from './components/Reports'; // Naya Module
+import ExpenseTracker from './components/ExpenseTracker'; // Naya Module
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -17,12 +19,15 @@ function App() {
     setSidebarOpen(false);
   };
 
+  // Menu items mein Reports aur Expenses add kar diye hain
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'additem', label: 'Add New Item', icon: '➕' },
     { id: 'inventory', label: 'Stock View', icon: '📦' },
     { id: 'sales', label: 'New Sale (POS)', icon: '💰' },
     { id: 'history', label: 'Sales History', icon: '📜' },
+    { id: 'reports', label: 'Reports & Profit', icon: '📈' },
+    { id: 'expenses', label: 'Expenses', icon: '💸' },
   ];
 
   const styles = `
@@ -39,7 +44,7 @@ function App() {
     }
     
     .menu-btn { 
-      position: fixed; top: 15px; left: 15px; z-index: 1001; background: #f59e0b; 
+      position: fixed; top: 15px; left: 15px; z-index: 1001; background: #D4AF37; 
       border: none; border-radius: 5px; padding: 8px 12px; cursor: pointer; color: #000; font-weight: bold;
     }
 
@@ -47,8 +52,8 @@ function App() {
       padding: 15px 25px; cursor: pointer; display: flex; align-items: center; gap: 15px;
       transition: 0.2s; font-weight: 500; color: #aaa;
     }
-    .nav-item:hover { background: #1a1a1a; color: #f59e0b; }
-    .nav-item.active { background: #1a1a1a; color: #f59e0b; border-left: 4px solid #f59e0b; }
+    .nav-item:hover { background: #1a1a1a; color: #D4AF37; }
+    .nav-item.active { background: #1a1a1a; color: #D4AF37; border-left: 4px solid #D4AF37; }
 
     .main-content { 
       flex: 1; margin-left: 0; transition: 0.3s; width: 100%;
@@ -56,7 +61,7 @@ function App() {
     }
 
     .logo-area { padding: 0 25px 30px; border-bottom: 1px solid #222; margin-bottom: 20px; }
-    .logo-text { font-style: italic; font-weight: 900; color: #f59e0b; font-size: 20px; }
+    .logo-text { font-style: italic; font-weight: 900; color: #D4AF37; font-size: 20px; }
   `;
 
   return (
@@ -74,7 +79,7 @@ function App() {
       {/* Sidebar Navigation */}
       <nav className="sidebar">
         <div className="logo-area">
-          <div className="logo-text">GEMINI IMS</div>
+          <div className="logo-text">PREMIUM CERAMICS</div>
           <small style={{color:'#444'}}>v2.0 Beta</small>
         </div>
         {menuItems.map(item => (
@@ -84,7 +89,7 @@ function App() {
             onClick={() => {
               setActiveTab(item.id);
               setSidebarOpen(false);
-              if(item.id !== 'additem') setEditData(null); // Clear edit data if moving away
+              if(item.id !== 'additem') setEditData(null);
             }}
           >
             <span>{item.icon}</span> {item.label}
@@ -113,6 +118,11 @@ function App() {
         {activeTab === 'sales' && <SalesModule />}
         
         {activeTab === 'history' && <SalesHistory />}
+
+        {/* Naye Modules Yahan Add Hain */}
+        {activeTab === 'reports' && <Reports />}
+
+        {activeTab === 'expenses' && <ExpenseTracker />}
       </main>
     </div>
   );

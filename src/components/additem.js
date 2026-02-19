@@ -19,7 +19,7 @@ const AddItem = ({ editData, onComplete }) => {
     name: '', company: '', category: '', subCategory: '', warehouse: '',
     pcsPerBox: '', openingStock: '', totalPcs: 0,
     length: '', width: '', height: '',
-    weightKg: '', purchasePrice: '', tradePrice: '', retailPrice: '',
+    weightKg: '', totalWeight: 0, purchasePrice: '', tradePrice: '', retailPrice: '',
     minStock: '', maxStock: '',
     barcodeData: '', qrCodeData: '', imageUrl: null 
   };
@@ -31,20 +31,27 @@ const AddItem = ({ editData, onComplete }) => {
     else { setFormData(initialFormState); }
   }, [editData]);
 
-  // Logic for Total PCS and Barcode/QR update
+  // Logic for Totals, Barcode and QR update
   useEffect(() => {
-    const total = (parseFloat(formData.openingStock) || 0) * (parseFloat(formData.pcsPerBox) || 0);
+    const stock = parseFloat(formData.openingStock) || 0;
+    const pcsBox = parseFloat(formData.pcsPerBox) || 0;
+    const weightVal = parseFloat(formData.weightKg) || 0;
+
+    const totalPcsCalc = stock * pcsBox;
+    const totalWeightCalc = (stock * weightVal).toFixed(2); // Opening Stock * Weight
+
     const nameUpper = (formData.name || '').toUpperCase();
     const L = formData.length || '0';
     const W = formData.width || '0';
     const H = formData.height || '0';
     
     const bText = `SN:${formData.srNo}|SKU:${formData.sku}|PCS:${formData.pcsPerBox || 0}|VOL:${L}x${W}x${H}|WT:${formData.weightKg || 0}KG|PUR:${formData.purchasePrice || 0}|MIN:${formData.minStock || 0}|MAX:${formData.maxStock || 0}`;
-    const qText = `ITEM:${nameUpper}|CO:${(formData.company || '').toUpperCase()}|WH:${(formData.warehouse || '').toUpperCase()}|TPCS:${total}`;
+    const qText = `ITEM:${nameUpper}|CO:${(formData.company || '').toUpperCase()}|WH:${(formData.warehouse || '').toUpperCase()}|TPCS:${totalPcsCalc}`;
 
     setFormData(prev => ({ 
       ...prev, 
-      totalPcs: total,
+      totalPcs: totalPcsCalc,
+      totalWeight: totalWeightCalc,
       sku: nameUpper ? `${nameUpper.substring(0, 3)}-${prev.srNo}` : prev.sku,
       barcodeData: bText,
       qrCodeData: qText
@@ -55,7 +62,6 @@ const AddItem = ({ editData, onComplete }) => {
     .add-item-container { background-color: #000; min-height: 100vh; padding: 20px; font-family: 'Segoe UI', sans-serif; color: #fff; }
     .layout-grid { display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 25px; max-width: 1200px; margin: 0 auto; }
     
-    /* Left Card Inner Center Align */
     .form-card { background-color: #111; padding: 30px; border-radius: 30px; border: 1px solid #222; display: flex; flex-direction: column; align-items: center; }
     .form-inner-container { width: 60%; display: flex; flex-direction: column; }
     
@@ -98,6 +104,7 @@ const AddItem = ({ editData, onComplete }) => {
           const sku = `${name.substring(0, 3)}-${sr}`;
           const openStock = parseFloat(item["Opening Stock"]) || 0;
           const pcsBox = parseFloat(item["Pcs Per Box"]) || 0;
+          const wt = parseFloat(item["Weight KG"]) || 0;
           
           batch.set(newDocRef, {
             name, srNo: sr, sku,
@@ -108,10 +115,11 @@ const AddItem = ({ editData, onComplete }) => {
             pcsPerBox: pcsBox,
             openingStock: openStock,
             totalPcs: openStock * pcsBox,
+            totalWeight: (openStock * wt).toFixed(2),
             length: item["Length"] || '0',
             width: item["Width"] || '0',
             height: item["Height"] || '0',
-            weightKg: item["Weight KG"] || '0',
+            weightKg: wt,
             purchasePrice: item["Purchase Price"] || 0,
             tradePrice: item["Trade Price"] || 0,
             retailPrice: item["Retail Price"] || 0,
@@ -145,9 +153,8 @@ const AddItem = ({ editData, onComplete }) => {
   return (
     <div className="add-item-container">
       <style>{styles}</style>
-        <h2 style={{ fontStyle: 'italic', fontWeight: '900', color: '#f59e0b', textAlign:'center', marginBottom: '30px' }}>PRODUCT REGISTRATION</h2>
+      <h2 style={{ fontStyle: 'italic', fontWeight: '900', color: '#f59e0b', textAlign:'center', marginBottom: '30px' }}>PRODUCT REGISTRATION</h2>
       <div className="layout-grid">
-        {/* LEFT CARD - FORM */}
         <div className="form-card">
           <div className="form-inner-container">
             <form onSubmit={handleSubmit}>
@@ -171,14 +178,17 @@ const AddItem = ({ editData, onComplete }) => {
                 </div>
               </div>
 
+              {/* Opening Stock, Pcs Per Box, Weight KG in one line */}
               <div className="input-group-row">
                 <div className="flex-1"><label className="label-text">Opening Stock</label><input type="number" className="custom-input" value={formData.openingStock} onChange={e=>setFormData({...formData, openingStock: e.target.value})} /></div>
                 <div className="flex-1"><label className="label-text">Pcs Per Box *</label><input type="number" className="custom-input" value={formData.pcsPerBox} onChange={e=>setFormData({...formData, pcsPerBox: e.target.value})} required /></div>
+                <div className="flex-1"><label className="label-text">Weight (KG)</label><input type="number" step="0.01" className="custom-input" value={formData.weightKg} onChange={e=>setFormData({...formData, weightKg: e.target.value})} /></div>
               </div>
 
+              {/* Total PCS and Total Weight in one line */}
               <div className="input-group-row">
                 <div className="flex-1"><label className="label-text">Total PCS (Auto)</label><input className="readonly-input" value={formData.totalPcs} readOnly /></div>
-                <div className="flex-1"><label className="label-text">Weight (KG)</label><input type="number" step="0.01" className="custom-input" value={formData.weightKg} onChange={e=>setFormData({...formData, weightKg: e.target.value})} /></div>
+                <div className="flex-1"><label className="label-text">Total Weight (KG)</label><input className="readonly-input" value={formData.totalWeight} readOnly /></div>
               </div>
 
               <div className="input-group-single"><label className="label-text">Volume (L x W x H)</label>
@@ -200,7 +210,6 @@ const AddItem = ({ editData, onComplete }) => {
           </div>
         </div>
 
-        {/* RIGHT CARD - PREVIEW & ACTIONS */}
         <div className="preview-card">
           <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
             <button type="button" className="btn-top" onClick={() => {/* Template Download Logic */}}>Template</button>
@@ -227,7 +236,7 @@ const AddItem = ({ editData, onComplete }) => {
             <label className="label-text" style={{color: '#f59e0b'}}>QR Data</label>
             <div style={{fontSize:'10px', color:'#888', wordBreak: 'break-all'}}>{formData.qrCodeData}</div>
           </div>
-              <button type="submit" className="btn-main">{statusMessage || (editData ? "UPDATE ITEM" : "SAVE ITEM")}</button>
+          <button type="submit" className="btn-main" onClick={handleSubmit}>{statusMessage || (editData ? "UPDATE ITEM" : "SAVE ITEM")}</button>
         </div>
       </div>
       <input type="file" ref={fileInputRef} hidden onChange={e => {
@@ -240,5 +249,3 @@ const AddItem = ({ editData, onComplete }) => {
 };
 
 export default AddItem;
-
-

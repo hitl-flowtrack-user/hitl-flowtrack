@@ -2,23 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, onSnapshot, writeBatch, doc, serverTimestamp } from "firebase/firestore";
 
-const SalesModule = ({ user }) => { // User prop contains login ID/Name
+const SalesModule = ({ user }) => {
   const [items, setItems] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState([]);
   const [customerName, setCustomerName] = useState('');
   const [selectedWarehouse, setSelectedWarehouse] = useState('All');
-  
-  // Advanced Billing States
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Advanced Charges
   const [discount, setDiscount] = useState({ type: 'cash', val: 0 });
   const [rent, setRent] = useState({ type: 'cash', val: 0 });
-  const [loading, setLoading] = useState({ type: 'cash', val: 0 });
-  const [unloading, setUnloading] = useState({ type: 'cash', val: 0 });
+  const [loadingFee, setLoadingFee] = useState({ type: 'cash', val: 0 });
+  const [unloadingFee, setUnloadingFee] = useState({ type: 'cash', val: 0 });
   const [extraCharges, setExtraCharges] = useState(0);
-  
-  // Payment States
-  const [paymentType, setPaymentType] = useState('cash'); // cash, credit, partial
-  const [paidAmount, setPaidAmount] = useState(0);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "inventory_records"), (snapshot) => {
@@ -30,177 +27,181 @@ const SalesModule = ({ user }) => { // User prop contains login ID/Name
   const addToCart = (item) => {
     const existing = cart.find(c => c.id === item.id);
     if (existing) {
-      updateCartQty(item.id, existing.quantity + 1);
+      setCart(cart.map(c => c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c));
     } else {
       setCart([...cart, { ...item, quantity: 1, salePrice: item.retailPrice }]);
     }
   };
 
-  const updateCartQty = (id, newQty) => {
-    setCart(cart.map(c => c.id === id ? { ...c, quantity: parseInt(newQty) || 0 } : c));
+  const calculateTotal = () => {
+    const sub = cart.reduce((acc, c) => acc + (c.salePrice * c.quantity), 0);
+    const getVal = (obj) => obj.type === 'percent' ? (sub * (parseFloat(obj.val || 0) / 100)) : parseFloat(obj.val || 0);
+    return sub - getVal(discount) + getVal(rent) + getVal(loadingFee) + getVal(unloadingFee) + parseFloat(extraCharges || 0);
   };
-
-  // Calculation Logic
-  const getSubTotal = () => cart.reduce((acc, c) => acc + (c.salePrice * c.quantity), 0);
-  
-  const calculateFinal = () => {
-    const sub = getSubTotal();
-    const getVal = (obj) => obj.type === 'percent' ? (sub * (obj.val / 100)) : parseFloat(obj.val || 0);
-    
-    const discVal = getVal(discount);
-    const rentVal = getVal(rent);
-    const loadVal = getVal(loading);
-    const unloadVal = getVal(unloading);
-    
-    return sub - discVal + rentVal + loadVal + unloadVal + parseFloat(extraCharges || 0);
-  };
-
-  const finalAmount = calculateFinal();
 
   const handleSale = async () => {
-    if (!customerName || cart.length === 0) return alert("Details missing!");
-    setLoading(true);
+    if (!customerName || cart.length === 0) return alert("Fill details first!");
+    setIsProcessing(true);
     const batch = writeBatch(db);
+    const finalAmt = calculateTotal();
 
     try {
       const saleRef = doc(collection(db, "sales_records"));
       const saleData = {
         customerName,
         salesman: user?.name || "Admin",
-        salesmanId: user?.uid || "admin01",
         items: cart,
-        subTotal: getSubTotal(),
-        discounts: discount,
-        charges: { rent, loading, unloading, extra: extraCharges },
-        totalAmount: finalAmount,
-        paymentStatus: paymentType,
-        paidAmount: paymentType === 'cash' ? finalAmount : (paymentType === 'credit' ? 0 : paidAmount),
-        balance: paymentType === 'credit' ? finalAmount : (paymentType === 'partial' ? finalAmount - paidAmount : 0),
-        warehouse: selectedWarehouse,
+        totalAmount: finalAmt,
         createdAt: serverTimestamp(),
       };
-
       batch.set(saleRef, saleData);
 
-      // Inventory Minus
-      cart.forEach(product => {
-        const itemRef = doc(db, "inventory_records", product.id);
-        const newStockPcs = (parseFloat(product.totalPcs) || 0) - product.quantity;
-        batch.update(itemRef, {
-          totalPcs: newStockPcs,
-          openingStock: (newStockPcs / (product.pcsPerBox || 1)).toFixed(2)
-        });
+      // Inventory Update
+      cart.forEach(item => {
+        const itemRef = doc(db, "inventory_records", item.id);
+        const newPcs = (item.totalPcs || 0) - item.quantity;
+        batch.update(itemRef, { totalPcs: newPcs });
       });
 
       await batch.commit();
-      alert("Sale Recorded Successfully!");
+      alert("Sale Finalized!");
       setCart([]); setCustomerName('');
-    } catch (err) { alert(err.message); }
-    setLoading(false);
+    } catch (e) { alert(e.message); }
+    setIsProcessing(false);
   };
 
-  const filteredItems = items.filter(item => 
-    (selectedWarehouse === 'All' || item.warehouse === selectedWarehouse) &&
-    (item.name?.toLowerCase().includes(searchTerm.toLowerCase()) || item.sku?.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-
   const styles = `
-    .pos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; background: #000; color: #fff; padding: 10px; }
-    .item-box { background: #111; padding: 15px; border-radius: 12px; height: 85vh; overflow-y: auto; border: 1px solid #222; }
-    .bill-box { background: #111; padding: 15px; border-radius: 12px; border-top: 4px solid #f59e0b; }
-    .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-    .calc-field { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-top: 5px; border: 1px solid #333; }
-    .calc-field select, .calc-field input { background: transparent; color: #fff; border: none; outline: none; width: 45%; }
-    .total-banner { background: #f59e0b; color: #000; padding: 15px; border-radius: 10px; text-align: center; font-size: 24px; font-weight: 900; margin-top: 15px; }
-    .search-bar { width: 100%; padding: 10px; border-radius: 8px; background: #222; border: 1px solid #444; color: #fff; margin-bottom: 10px; }
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&display=swap');
+    
+    .pos-wrapper { 
+      display: grid; grid-template-columns: 1.4fr 1fr; gap: 25px; 
+      padding: 25px; background: #0a0d12; min-height: 90vh;
+      font-family: 'Outfit', sans-serif; color: #fff;
+    }
+
+    .glass-panel { 
+      background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 24px; padding: 25px; backdrop-filter: blur(10px);
+    }
+
+    .search-input {
+      width: 100%; background: #161b22; border: 1px solid #30363d;
+      padding: 15px; border-radius: 12px; color: #fff; font-size: 15px; margin-bottom: 20px;
+    }
+
+    .item-grid { 
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); 
+      gap: 15px; max-height: 65vh; overflow-y: auto; padding-right: 10px;
+    }
+
+    .item-card {
+      background: #1c2128; border-radius: 16px; padding: 15px; border: 1px solid transparent;
+      transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer;
+    }
+    .item-card:hover { border-color: #58a6ff; transform: translateY(-5px); background: #21262d; }
+    .item-name { font-weight: 600; font-size: 14px; margin-bottom: 5px; color: #e6edf3; }
+    .item-price { color: #3fb950; font-weight: 900; font-size: 16px; }
+
+    .checkout-header { font-size: 22px; font-weight: 900; margin-bottom: 20px; color: #58a6ff; }
+    
+    .cart-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 0; border-bottom: 1px solid #30363d;
+    }
+
+    .charge-grid { 
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px;
+    }
+
+    .charge-box {
+      background: #161b22; padding: 10px; border-radius: 12px; border: 1px solid #30363d;
+    }
+    .charge-box label { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; }
+    .charge-box input { background: transparent; border: none; color: #fff; width: 50%; font-weight: bold; outline: none; }
+    .charge-box select { background: transparent; border: none; color: #58a6ff; font-size: 12px; outline: none; }
+
+    .total-container {
+      margin-top: 25px; padding: 20px; background: linear-gradient(135deg, #1f6feb 0%, #0969da 100%);
+      border-radius: 18px; text-align: center; box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+    }
+    .total-label { font-size: 13px; opacity: 0.8; text-transform: uppercase; }
+    .total-value { font-size: 32px; font-weight: 900; }
+
+    .btn-finalize {
+      width: 100%; padding: 18px; margin-top: 15px; border-radius: 15px; border: none;
+      background: #238636; color: #fff; font-weight: 900; cursor: pointer; font-size: 16px;
+      transition: 0.2s;
+    }
+    .btn-finalize:hover { background: #2ea043; transform: scale(1.02); }
   `;
 
   return (
-    <div className="pos-grid">
+    <div className="pos-wrapper">
       <style>{styles}</style>
       
-      {/* Search & Warehouse Selection */}
-      <div className="item-box">
-        <div className="input-row">
-          <input type="text" className="search-bar" placeholder="Search Product..." onChange={e => setSearchTerm(e.target.value)} />
-          <select className="search-bar" onChange={e => setSelectedWarehouse(e.target.value)}>
+      {/* Products Side */}
+      <div className="glass-panel">
+        <div style={{display:'flex', gap:'15px'}}>
+          <input className="search-input" placeholder="🔍 Search items..." onChange={e => setSearchTerm(e.target.value)} />
+          <select className="search-input" style={{width:'200px'}} onChange={e => setSelectedWarehouse(e.target.value)}>
             <option value="All">All Warehouses</option>
             {[...new Set(items.map(i => i.warehouse))].map(wh => <option key={wh} value={wh}>{wh}</option>)}
           </select>
         </div>
-        
-        {filteredItems.map(item => (
-          <div key={item.id} className="calc-field" style={{cursor:'pointer'}} onClick={() => addToCart(item)}>
-            <div style={{fontWeight:'bold'}}>{item.name} <small style={{color:'#f59e0b'}}>({item.warehouse})</small></div>
-            <div style={{fontSize:'12px', color:'#888'}}>Stock: {item.totalPcs} | Rs. {item.retailPrice}</div>
-          </div>
-        ))}
+
+        <div className="item-grid">
+          {items.filter(i => (selectedWarehouse === 'All' || i.warehouse === selectedWarehouse) && i.name.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
+            <div key={item.id} className="item-card" onClick={() => addToCart(item)}>
+              <div className="item-name">{item.name}</div>
+              <div className="item-price">Rs. {item.retailPrice}</div>
+              <div style={{fontSize:'11px', color:'#8b949e'}}>Stock: {item.totalPcs}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Advanced Billing */}
-      <div className="bill-box">
-        <input type="text" className="search-bar" placeholder="Customer Name" value={customerName} onChange={e => setCustomerName(e.target.value)} />
-        
-        <div style={{maxHeight:'200px', overflowY:'auto', borderBottom:'1px solid #222', marginBottom:'10px'}}>
-          <table width="100%" style={{fontSize:'13px'}}>
-            <thead><tr style={{color:'#f59e0b'}}><th>Item</th><th>Qty</th><th>Total</th></tr></thead>
-            <tbody>
-              {cart.map(c => (
-                <tr key={c.id}><td>{c.name}</td><td>{c.quantity}</td><td>{c.quantity * c.salePrice}</td></tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Checkout Side */}
+      <div className="glass-panel" style={{borderTop: '6px solid #1f6feb'}}>
+        <div className="checkout-header">Order Summary</div>
+        <input className="search-input" placeholder="Customer Name" value={customerName} onChange={e => setCustomerName(e.target.value)} />
+
+        <div style={{minHeight:'150px', maxHeight:'250px', overflowY:'auto'}}>
+          {cart.map(c => (
+            <div className="cart-item" key={c.id}>
+              <div>
+                <div style={{fontWeight:600}}>{c.name}</div>
+                <small style={{color:'#8b949e'}}>Qty: {c.quantity} x {c.salePrice}</small>
+              </div>
+              <div style={{fontWeight:900}}>Rs. {c.quantity * c.salePrice}</div>
+            </div>
+          ))}
         </div>
 
-        {/* Adjustments */}
-        <div className="input-row">
-          <div className="calc-field">
-            <span style={{fontSize:'10px'}}>DISCOUNT</span><br/>
+        <div className="charge-grid">
+          <div className="charge-box"><label>Discount</label>
+            <input type="number" onChange={e => setDiscount({...discount, val: e.target.value})} />
             <select onChange={e => setDiscount({...discount, type: e.target.value})}><option value="cash">Rs</option><option value="percent">%</option></select>
-            <input type="number" placeholder="0" onChange={e => setDiscount({...discount, val: e.target.value})} />
           </div>
-          <div className="calc-field">
-            <span style={{fontSize:'10px'}}>RENT / FREIGHT</span><br/>
+          <div className="charge-box"><label>Rent</label>
+            <input type="number" onChange={e => setRent({...rent, val: e.target.value})} />
             <select onChange={e => setRent({...rent, type: e.target.value})}><option value="cash">Rs</option><option value="percent">%</option></select>
-            <input type="number" placeholder="0" onChange={e => setRent({...rent, val: e.target.value})} />
+          </div>
+          <div className="charge-box"><label>Loading</label>
+            <input type="number" onChange={e => setLoadingFee({...loadingFee, val: e.target.value})} />
+            <select onChange={e => setLoadingFee({...loadingFee, type: e.target.value})}><option value="cash">Rs</option><option value="percent">%</option></select>
+          </div>
+          <div className="charge-box"><label>Extra</label>
+            <input type="number" style={{width:'100%'}} onChange={e => setExtraCharges(e.target.value)} />
           </div>
         </div>
 
-        <div className="input-row">
-          <div className="calc-field">
-            <span style={{fontSize:'10px'}}>LOADING</span><br/>
-            <select onChange={e => setLoading({...loading, type: e.target.value})}><option value="cash">Rs</option><option value="percent">%</option></select>
-            <input type="number" placeholder="0" onChange={e => setLoading({...loading, val: e.target.value})} />
-          </div>
-          <div className="calc-field">
-            <span style={{fontSize:'10px'}}>UNLOADING</span><br/>
-            <select onChange={e => setUnloading({...unloading, type: e.target.value})}><option value="cash">Rs</option><option value="percent">%</option></select>
-            <input type="number" placeholder="0" onChange={e => setUnloading({...unloading, val: e.target.value})} />
-          </div>
+        <div className="total-container">
+          <div className="total-label">Payable Amount</div>
+          <div className="total-value">Rs. {calculateTotal().toLocaleString()}</div>
         </div>
 
-        <div className="calc-field">
-          <span style={{fontSize:'10px'}}>EXTRA CHARGES / MISC</span>
-          <input style={{width:'100%'}} type="number" placeholder="Enter amount" onChange={e => setExtraCharges(e.target.value)} />
-        </div>
-
-        {/* Payment Split */}
-        <div className="input-row" style={{marginTop:'10px'}}>
-          <select className="search-bar" onChange={e => setPaymentType(e.target.value)}>
-            <option value="cash">Full Cash</option>
-            <option value="credit">Full Credit (Udhaar)</option>
-            <option value="partial">Partial (Some Cash + Credit)</option>
-          </select>
-          {paymentType === 'partial' && <input type="number" className="search-bar" placeholder="Paid Amount" onChange={e => setPaidAmount(e.target.value)} />}
-        </div>
-
-        <div className="total-banner">
-          <div style={{fontSize:'12px', fontWeight:'normal'}}>Net Payable Amount</div>
-          Rs. {finalAmount.toLocaleString()}
-        </div>
-
-        <button className="checkout-btn" style={{width:'100%', padding:'15px', marginTop:'10px', background:'#10b981', fontWeight:'bold', cursor:'pointer'}} onClick={handleSale}>
-          FINALIZE SALE & PRINT
+        <button className="btn-finalize" onClick={handleSale} disabled={isProcessing}>
+          {isProcessing ? "PROCESSING..." : "FINALIZE & PRINT"}
         </button>
       </div>
     </div>

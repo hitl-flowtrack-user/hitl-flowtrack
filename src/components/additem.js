@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { db } from '../firebase'; 
-import { collection, addDoc, serverTimestamp, getDocs, query, where, writeBatch, doc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, writeBatch, doc, updateDoc, onSnapshot } from "firebase/firestore";
 
 const AddItem = ({ editData, onComplete }) => {
   const fileInputRef = useRef(null);
   const excelInputRef = useRef(null);
   const [statusMessage, setStatusMessage] = useState('');
   
-  const [companies, setCompanies] = useState(['ELITE CO', 'GENERIC']);
-  const [categories, setCategories] = useState(['ELECTRONICS', 'GENERAL']);
-  const [subCategories, setSubCategories] = useState(['STANDARD']);
-  const [warehouses, setWarehouses] = useState(['MAIN STORE', 'WAREHOUSE A']);
+  // Dynamic states for searchable dropdowns
+  const [companies, setCompanies] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [subCategories, setSubCategories] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
 
   const initialFormState = {
     srNo: `SR-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -26,11 +27,31 @@ const AddItem = ({ editData, onComplete }) => {
 
   const [formData, setFormData] = useState(initialFormState);
 
+  // Fetch unique values from Firestore for searchable dropdowns
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "inventory_records"), (snapshot) => {
+      const docs = snapshot.docs.map(doc => doc.data());
+      
+      const uniqueComps = [...new Set(docs.map(item => item.company))].filter(Boolean);
+      const uniqueCats = [...new Set(docs.map(item => item.category))].filter(Boolean);
+      const uniqueSubs = [...new Set(docs.map(item => item.subCategory))].filter(Boolean);
+      const uniqueWHs = [...new Set(docs.map(item => item.warehouse))].filter(Boolean);
+
+      setCompanies(uniqueComps.length > 0 ? uniqueComps : ['ELITE CO', 'GENERIC']);
+      setCategories(uniqueCats.length > 0 ? uniqueCats : ['ELECTRONICS', 'GENERAL']);
+      setSubCategories(uniqueSubs.length > 0 ? uniqueSubs : ['STANDARD']);
+      setWarehouses(uniqueWHs.length > 0 ? uniqueWHs : ['MAIN STORE', 'WAREHOUSE A']);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   useEffect(() => {
     if (editData) { setFormData({ ...editData }); } 
     else { setFormData(initialFormState); }
   }, [editData]);
 
+  // Calculations Logic
   useEffect(() => {
     const stock = parseFloat(formData.openingStock) || 0;
     const pcsBox = parseFloat(formData.pcsPerBox) || 0;
@@ -80,15 +101,7 @@ const AddItem = ({ editData, onComplete }) => {
     .btn-main { background-color: #f59e0b; color: #000; width: 100%; padding: 18px; border-radius: 15px; border: none; font-weight: 900; cursor: pointer; margin-top: 20px; text-transform: uppercase; font-size: 15px; }
     .btn-top { background-color: #f59e0b; color: #000; border: none; border-radius: 8px; padding: 8px 12px; font-weight: bold; cursor: pointer; font-size: 10px; flex: 1; }
     
-    /* Barcode & QR Data Boxes with 20px Radius */
-    .preview-data-box { 
-      text-align: left; 
-      background: #000; 
-      padding: 12px; 
-      border-radius: 20px; 
-      margin-top: 10px; 
-      border: 2px solid #f59e0b; 
-    }
+    .preview-data-box { text-align: left; background: #000; padding: 12px; border-radius: 20px; margin-top: 10px; border: 2px solid #f59e0b; }
 
     @media (max-width: 900px) { .layout-grid { grid-template-columns: 1fr; } .form-inner-container { width: 100%; } }
   `;
@@ -156,16 +169,14 @@ const AddItem = ({ editData, onComplete }) => {
   return (
     <div className="add-item-container">
       <style>{styles}</style>
-      
+      <h2 style={{ fontStyle: 'italic', fontWeight: '900', color: '#f59e0b', textAlign:'center', marginBottom: '20px' }}>PRODUCT REGISTRATION</h2>
       <div className="layout-grid">
         <div className="form-card">
-      <h2 style={{ fontStyle: 'italic', fontWeight: '900', color: '#f59e0b', textAlign:'center', marginBottom: '20px' }}>PRODUCT REGISTRATION</h2>
           <div className="form-inner-container">
             <form onSubmit={handleSubmit}>
               <div className="input-group-single"><label className="label-text">Item Name *</label><input className="custom-input" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})} required /></div>
               
               <div className="input-group-row">
-                {/* Searchable Company */}
                 <div className="flex-1-5"><label className="label-text">Company *</label>
                   <div style={{display:'flex'}}>
                     <input list="company-list" className="custom-input" value={formData.company} onChange={e=>setFormData({...formData, company: e.target.value.toUpperCase()})} placeholder="Search/Select" required />
@@ -173,7 +184,6 @@ const AddItem = ({ editData, onComplete }) => {
                     <button type="button" onClick={()=>setCompanies([...companies, prompt("New Company")?.toUpperCase()])} className="btn-plus">+</button>
                   </div>
                 </div>
-                {/* Searchable Category */}
                 <div className="flex-1-5"><label className="label-text">Category *</label>
                   <div style={{display:'flex'}}>
                     <input list="category-list" className="custom-input" value={formData.category} onChange={e=>setFormData({...formData, category: e.target.value.toUpperCase()})} placeholder="Search/Select" required />
@@ -184,7 +194,6 @@ const AddItem = ({ editData, onComplete }) => {
               </div>
 
               <div className="input-group-row">
-                {/* Searchable Sub-Category */}
                 <div className="flex-1-5"><label className="label-text">Sub-Category *</label>
                   <div style={{display:'flex'}}>
                     <input list="sub-list" className="custom-input" value={formData.subCategory} onChange={e=>setFormData({...formData, subCategory: e.target.value.toUpperCase()})} placeholder="Search/Select" required />
@@ -192,7 +201,6 @@ const AddItem = ({ editData, onComplete }) => {
                     <button type="button" onClick={()=>setSubCategories([...subCategories, prompt("New Sub-Category")?.toUpperCase()])} className="btn-plus">+</button>
                   </div>
                 </div>
-                {/* Searchable Warehouse */}
                 <div className="flex-1-5"><label className="label-text">Warehouse *</label>
                   <div style={{display:'flex'}}>
                     <input list="wh-list" className="custom-input" value={formData.warehouse} onChange={e=>setFormData({...formData, warehouse: e.target.value.toUpperCase()})} placeholder="Search/Select" required />
@@ -234,7 +242,7 @@ const AddItem = ({ editData, onComplete }) => {
 
         <div className="preview-card">
           <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-            <button type="button" className="btn-top" onClick={() => {/* Template Logic */}}>Template</button>
+            <button type="button" className="btn-top">Template</button>
             <button type="button" className="btn-top" onClick={() => excelInputRef.current.click()}>Excel Import</button>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
@@ -266,4 +274,3 @@ const AddItem = ({ editData, onComplete }) => {
 };
 
 export default AddItem;
-

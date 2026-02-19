@@ -26,7 +26,6 @@ const InventoryView = ({ onEdit }) => {
     }
   };
 
-  // Logic to download labels on click
   const downloadLabel = (id, type) => {
     const svg = document.getElementById(`${type}-${id}`);
     if (!svg) return;
@@ -37,8 +36,7 @@ const InventoryView = ({ onEdit }) => {
     const img = new Image();
     
     img.onload = () => {
-      // 5x Quality improvement logic
-      const scaleFactor = 5;
+      const scaleFactor = 5; // 5x High Resolution
       canvas.width = img.width * scaleFactor;
       canvas.height = img.height * scaleFactor;
       ctx.fillStyle = "white";
@@ -48,7 +46,7 @@ const InventoryView = ({ onEdit }) => {
       
       const pngFile = canvas.toDataURL("image/png", 1.0);
       const downloadLink = document.createElement("a");
-      downloadLink.download = `${type}-${id}-highres.png`;
+      downloadLink.download = `${type}-${id}-2inch-labels.png`;
       downloadLink.href = pngFile;
       downloadLink.click();
     };
@@ -72,10 +70,22 @@ const InventoryView = ({ onEdit }) => {
     th { background: #1a1a1a; color: #f59e0b; text-align: left; padding: 15px; font-size: 12px; text-transform: uppercase; }
     td { padding: 15px; border-bottom: 1px solid #222; font-size: 14px; vertical-align: middle; }
     .item-img { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; background: #222; }
-    .label-clickable { background: #fff; padding: 8px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.2s; border: 2px solid transparent; }
-    .label-clickable:hover { border-color: #f59e0b; transform: scale(1.05); }
-    .action-btn { padding: 15px 25px; border-radius: 12px; border: none; cursor: pointer; font-weight: bold; font-size: 16px; transition: transform 0.2s; }
-    .action-btn:active { transform: scale(0.9); }
+    
+    /* White Border for Labels */
+    .label-clickable { 
+      background: #fff; 
+      padding: 5px; 
+      border-radius: 4px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      cursor: pointer; 
+      border: 2px solid #fff; 
+      box-shadow: 0 0 5px rgba(255,255,255,0.2);
+    }
+    .label-clickable:hover { border-color: #f59e0b; }
+
+    .action-btn { padding: 15px 25px; border-radius: 12px; border: none; cursor: pointer; font-weight: bold; font-size: 16px; }
     .edit-btn { background: #f59e0b; color: #000; margin-right: 10px; width: 100px; }
     .delete-btn { background: #ef4444; color: #fff; width: 100px; }
     .stat-card { background: #111; padding: 20px; border-radius: 20px; border: 1px solid #222; text-align: center; }
@@ -87,7 +97,7 @@ const InventoryView = ({ onEdit }) => {
       <style>{styles}</style>
       <div className="header-section">
         <h2 style={{ fontStyle: 'italic', fontWeight: '900', color: '#f59e0b', margin: 0 }}>INVENTORY DASHBOARD</h2>
-        <input type="text" className="search-bar" placeholder="Search product or SKU..." onChange={(e) => setSearchTerm(e.target.value)} />
+        <input type="text" className="search-bar" placeholder="Search..." onChange={(e) => setSearchTerm(e.target.value)} />
       </div>
 
       <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:'15px', marginBottom:'25px'}}>
@@ -98,50 +108,51 @@ const InventoryView = ({ onEdit }) => {
       </div>
 
       <div className="table-responsive">
-        {loading ? <div style={{padding:'40px', textAlign:'center', color: '#f59e0b'}}>Loading Inventory...</div> : (
+        {loading ? <div style={{padding:'40px', textAlign:'center', color: '#f59e0b'}}>Loading...</div> : (
           <table>
             <thead>
               <tr>
                 <th>Image</th>
-                <th>Product Details</th>
-                <th>Scan Labels (Click to DL)</th>
-                <th>Stock Stats</th>
+                <th>Details</th>
+                <th>Labels (Click to Download)</th>
+                <th>Stock</th>
                 <th>Pricing</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredItems.map((item) => {
-                // Reduced Barcode Data for better readability
-                const compactBarcodeData = `SN:${item.srNo}|PCS:${item.pcsPerBox}|VOL:${item.length}x${item.width}x${item.height}|WT:${item.weightKg}|PUR:${item.purchasePrice}`;
+                // Reduced Barcode Data: Removed Purchase Price and made compact (Approx 2-inch look)
+                const compactBarcodeData = `SN:${item.srNo}|PCS:${item.pcsPerBox}|VOL:${item.length}x${item.width}x${item.height}|WT:${item.weightKg}`;
                 
+                // Updated QR Data: Removed TPCS, added PCS/B
+                const updatedQrData = `ITEM:${item.name}|WH:${item.warehouse}|PCS/B:${item.pcsPerBox}`;
+
                 return (
                   <tr key={item.id}>
-                    <td><img src={item.imageUrl || ''} className="item-img" alt="Product"/></td>
+                    <td><img src={item.imageUrl || ''} className="item-img" alt="P"/></td>
                     <td>
                       <div style={{fontWeight:'bold', color:'#f59e0b'}}>{item.name}</div>
                       <div style={{fontSize:'11px', color:'#888'}}>{item.sku}</div>
-                      <div style={{fontSize:'11px', color:'#666'}}>{item.warehouse}</div>
                     </td>
                     <td>
-                      <div style={{display:'flex', gap:'12px'}}>
-                        <div className="label-clickable" title="Click to Download High-Res Barcode" onClick={() => downloadLabel(item.id, 'bc')}>
+                      <div style={{display:'flex', gap:'10px'}}>
+                        <div className="label-clickable" onClick={() => downloadLabel(item.id, 'bc')}>
                           <Barcode 
                             id={`bc-${item.id}`} 
                             value={compactBarcodeData} 
-                            width={1.2} 
-                            height={45} 
-                            fontSize={10} 
-                            margin={0} 
-                            background="transparent"
+                            width={0.8} // Reduced width for 2-inch appearance
+                            height={35} 
+                            fontSize={8} 
+                            margin={0}
                           />
                         </div>
-                        <div className="label-clickable" title="Click to Download High-Res QR" onClick={() => downloadLabel(item.id, 'qr')}>
+                        <div className="label-clickable" onClick={() => downloadLabel(item.id, 'qr')}>
                           <QRCodeSVG 
                             id={`qr-${item.id}`} 
-                            value={item.qrCodeData || 'N/A'} 
-                            size={60} 
-                            level="H" // High error correction for better scan
+                            value={updatedQrData} 
+                            size={55} 
+                            level="M" 
                             includeMargin={false}
                           />
                         </div>
@@ -149,12 +160,11 @@ const InventoryView = ({ onEdit }) => {
                     </td>
                     <td>
                       <div style={{fontWeight:'bold'}}>{item.openingStock} Boxes</div>
-                      <div style={{fontSize:'11px', color: '#f59e0b'}}>{item.totalPcs} Total Pcs</div>
-                      <div style={{fontSize:'11px', color: '#888'}}>{item.totalWeight} KG Weight</div>
+                      <div style={{fontSize:'11px'}}>{item.totalPcs} Pcs</div>
                     </td>
                     <td>
-                      <div style={{fontSize:'12px', color: '#ccc'}}>TP: {item.tradePrice}</div>
-                      <div style={{fontSize:'12px', color:'#f59e0b', fontWeight: 'bold'}}>RP: {item.retailPrice}</div>
+                      <div style={{fontSize:'12px'}}>TP: {item.tradePrice}</div>
+                      <div style={{fontSize:'12px', color:'#f59e0b'}}>RP: {item.retailPrice}</div>
                     </td>
                     <td>
                       <button className="action-btn edit-btn" onClick={() => onEdit(item)}>Edit</button>

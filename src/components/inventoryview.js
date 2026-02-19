@@ -26,22 +26,30 @@ const InventoryView = ({ onEdit }) => {
     }
   };
 
+  // Logic to download labels on click
   const downloadLabel = (id, type) => {
     const svg = document.getElementById(`${type}-${id}`);
+    if (!svg) return;
+    
     const svgData = new XMLSerializer().serializeToString(svg);
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     const img = new Image();
+    
     img.onload = () => {
-      canvas.width = img.width;
-      canvas.height = img.height;
+      // 5x Quality improvement logic
+      const scaleFactor = 5;
+      canvas.width = img.width * scaleFactor;
+      canvas.height = img.height * scaleFactor;
       ctx.fillStyle = "white";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.scale(scaleFactor, scaleFactor);
       ctx.drawImage(img, 0, 0);
-      const pngFile = canvas.toDataURL("image/png");
+      
+      const pngFile = canvas.toDataURL("image/png", 1.0);
       const downloadLink = document.createElement("a");
-      downloadLink.download = `${type}-${id}.png`;
-      downloadLink.href = `${pngFile}`;
+      downloadLink.download = `${type}-${id}-highres.png`;
+      downloadLink.href = pngFile;
       downloadLink.click();
     };
     img.src = "data:image/svg+xml;base64," + btoa(svgData);
@@ -64,8 +72,8 @@ const InventoryView = ({ onEdit }) => {
     th { background: #1a1a1a; color: #f59e0b; text-align: left; padding: 15px; font-size: 12px; text-transform: uppercase; }
     td { padding: 15px; border-bottom: 1px solid #222; font-size: 14px; vertical-align: middle; }
     .item-img { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; background: #222; }
-    .label-box { background: #fff; padding: 10px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; gap: 5px; width: fit-content; }
-    .dl-btn { font-size: 9px; background: #000; color: #fff; border: none; padding: 3px 6px; cursor: pointer; border-radius: 4px; }
+    .label-clickable { background: #fff; padding: 8px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.2s; border: 2px solid transparent; }
+    .label-clickable:hover { border-color: #f59e0b; transform: scale(1.05); }
     .action-btn { padding: 15px 25px; border-radius: 12px; border: none; cursor: pointer; font-weight: bold; font-size: 16px; transition: transform 0.2s; }
     .action-btn:active { transform: scale(0.9); }
     .edit-btn { background: #f59e0b; color: #000; margin-right: 10px; width: 100px; }
@@ -79,63 +87,82 @@ const InventoryView = ({ onEdit }) => {
       <style>{styles}</style>
       <div className="header-section">
         <h2 style={{ fontStyle: 'italic', fontWeight: '900', color: '#f59e0b', margin: 0 }}>INVENTORY DASHBOARD</h2>
-        <input type="text" className="search-bar" placeholder="Search..." onChange={(e) => setSearchTerm(e.target.value)} />
+        <input type="text" className="search-bar" placeholder="Search product or SKU..." onChange={(e) => setSearchTerm(e.target.value)} />
       </div>
 
       <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:'15px', marginBottom:'25px'}}>
         <div className="stat-card"><span className="stat-val">{items.length}</span><span style={{fontSize:'12px'}}>TOTAL ITEMS</span></div>
         <div className="stat-card"><span className="stat-val">{items.reduce((a,c)=>a+(parseFloat(c.openingStock)||0),0)} / {items.reduce((a,c)=>a+(parseFloat(c.totalPcs)||0),0)}</span><span style={{fontSize:'12px'}}>BOXES / PCS</span></div>
         <div className="stat-card"><span className="stat-val">{totalWeight.toFixed(2)} KG</span><span style={{fontSize:'12px'}}>TOTAL WEIGHT</span></div>
-        <div className="stat-card"><span className="stat-val">{totalTP.toLocaleString()}</span><span style={{fontSize:'12px'}}>TOTAL TP VALUE</span></div>
+        <div className="stat-card"><span className="stat-val">{totalTP.toLocaleString()}</span><span style={{fontSize:'12px'}}>TOTAL VALUE (TP)</span></div>
       </div>
 
       <div className="table-responsive">
-        {loading ? <div style={{padding:'40px', textAlign:'center'}}>Loading...</div> : (
+        {loading ? <div style={{padding:'40px', textAlign:'center', color: '#f59e0b'}}>Loading Inventory...</div> : (
           <table>
             <thead>
               <tr>
                 <th>Image</th>
-                <th>Product Info</th>
-                <th>Labels</th>
-                <th>Stock Details</th>
-                <th>Price Info</th>
+                <th>Product Details</th>
+                <th>Scan Labels (Click to DL)</th>
+                <th>Stock Stats</th>
+                <th>Pricing</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredItems.map((item) => (
-                <tr key={item.id}>
-                  <td><img src={item.imageUrl || ''} className="item-img" alt="P"/></td>
-                  <td>
-                    <div style={{fontWeight:'bold', color:'#f59e0b'}}>{item.name}</div>
-                    <div style={{fontSize:'11px', color:'#666'}}>{item.sku} | {item.warehouse}</div>
-                  </td>
-                  <td>
-                    <div style={{display:'flex', gap:'10px'}}>
-                      <div className="label-box">
-                        <Barcode id={`bc-${item.id}`} value={item.barcodeData || 'N/A'} width={1} height={40} fontSize={10} margin={0} />
-                        <button className="dl-btn" onClick={()=>downloadLabel(item.id, 'bc')}>Download</button>
+              {filteredItems.map((item) => {
+                // Reduced Barcode Data for better readability
+                const compactBarcodeData = `SN:${item.srNo}|PCS:${item.pcsPerBox}|VOL:${item.length}x${item.width}x${item.height}|WT:${item.weightKg}|PUR:${item.purchasePrice}`;
+                
+                return (
+                  <tr key={item.id}>
+                    <td><img src={item.imageUrl || ''} className="item-img" alt="Product"/></td>
+                    <td>
+                      <div style={{fontWeight:'bold', color:'#f59e0b'}}>{item.name}</div>
+                      <div style={{fontSize:'11px', color:'#888'}}>{item.sku}</div>
+                      <div style={{fontSize:'11px', color:'#666'}}>{item.warehouse}</div>
+                    </td>
+                    <td>
+                      <div style={{display:'flex', gap:'12px'}}>
+                        <div className="label-clickable" title="Click to Download High-Res Barcode" onClick={() => downloadLabel(item.id, 'bc')}>
+                          <Barcode 
+                            id={`bc-${item.id}`} 
+                            value={compactBarcodeData} 
+                            width={1.2} 
+                            height={45} 
+                            fontSize={10} 
+                            margin={0} 
+                            background="transparent"
+                          />
+                        </div>
+                        <div className="label-clickable" title="Click to Download High-Res QR" onClick={() => downloadLabel(item.id, 'qr')}>
+                          <QRCodeSVG 
+                            id={`qr-${item.id}`} 
+                            value={item.qrCodeData || 'N/A'} 
+                            size={60} 
+                            level="H" // High error correction for better scan
+                            includeMargin={false}
+                          />
+                        </div>
                       </div>
-                      <div className="label-box">
-                        <QRCodeSVG id={`qr-${item.id}`} value={item.qrCodeData || 'N/A'} size={50} />
-                        <button className="dl-btn" onClick={()=>downloadLabel(item.id, 'qr')}>Download</button>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{fontWeight:'bold'}}>{item.openingStock} Boxes</div>
-                    <div style={{fontSize:'11px'}}>{item.totalPcs} Pcs | {item.totalWeight} KG</div>
-                  </td>
-                  <td>
-                    <div style={{fontSize:'12px'}}>TP: {item.tradePrice}</div>
-                    <div style={{fontSize:'12px', color:'#10b981'}}>RP: {item.retailPrice}</div>
-                  </td>
-                  <td>
-                    <button className="action-btn edit-btn" onClick={() => onEdit(item)}>Edit</button>
-                    <button className="action-btn delete-btn" onClick={() => handleDelete(item.id)}>Del</button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td>
+                      <div style={{fontWeight:'bold'}}>{item.openingStock} Boxes</div>
+                      <div style={{fontSize:'11px', color: '#f59e0b'}}>{item.totalPcs} Total Pcs</div>
+                      <div style={{fontSize:'11px', color: '#888'}}>{item.totalWeight} KG Weight</div>
+                    </td>
+                    <td>
+                      <div style={{fontSize:'12px', color: '#ccc'}}>TP: {item.tradePrice}</div>
+                      <div style={{fontSize:'12px', color:'#f59e0b', fontWeight: 'bold'}}>RP: {item.retailPrice}</div>
+                    </td>
+                    <td>
+                      <button className="action-btn edit-btn" onClick={() => onEdit(item)}>Edit</button>
+                      <button className="action-btn delete-btn" onClick={() => handleDelete(item.id)}>Del</button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

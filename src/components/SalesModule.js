@@ -1,122 +1,120 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, writeBatch, doc, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
 
-const SalesModule = ({ user }) => {
+const SalesModule = () => {
   const [items, setItems] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState([]);
-  const [customerName, setCustomerName] = useState('');
-
-  // Complex Billing states
-  const [extraCharges, setExtraCharges] = useState({ discount: 0, labour: 0, freight: 0 });
+  const [customer, setCustomer] = useState('');
+  const [charges, setCharges] = useState({ discount: 0, labour: 0, freight: 0 });
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "inventory_records"), (snapshot) => {
-      setItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsub = onSnapshot(collection(db, "inventory_records"), (snap) => {
+      setItems(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    return () => unsubscribe();
+    return unsub;
   }, []);
 
   const addToCart = (item) => {
-    const existing = cart.find(c => c.id === item.id);
-    if (existing) {
-      setCart(cart.map(c => c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c));
+    const exist = cart.find(c => c.id === item.id);
+    if (exist) {
+      setCart(cart.map(c => c.id === item.id ? { ...c, qty: c.qty + 1 } : c));
     } else {
-      setCart([...cart, { ...item, quantity: 1, salePrice: item.retailPrice }]);
+      setCart([...cart, { ...item, qty: 1 }]);
     }
   };
 
-  const calculateSubTotal = () => cart.reduce((acc, c) => acc + (c.salePrice * c.quantity), 0);
-  const finalTotal = () => calculateSubTotal() - extraCharges.discount + parseFloat(extraCharges.labour || 0) + parseFloat(extraCharges.freight || 0);
+  const subTotal = cart.reduce((acc, c) => acc + (c.retailPrice * c.qty), 0);
+  const grandTotal = subTotal - parseFloat(charges.discount || 0) + parseFloat(charges.labour || 0) + parseFloat(charges.freight || 0);
+
+  const handleProcessSale = async () => {
+    if (cart.length === 0) return alert("Cart is empty!");
+    const saleData = {
+      customerName: customer,
+      cart,
+      subTotal,
+      ...charges,
+      totalAmount: grandTotal,
+      createdAt: serverTimestamp()
+    };
+    try {
+      await addDoc(collection(db, "sales_records"), saleData);
+      alert("Sale Saved Successfully!");
+      window.print(); // Triggers Print
+      setCart([]); setCustomer('');
+    } catch (e) { console.error(e); }
+  };
 
   const styles = `
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;900&display=swap');
-    .pos-container { background: #000; min-height: 100vh; padding: 20px; padding-top: 70px; font-family: 'Outfit', sans-serif; color: #fff; }
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap');
+    .pos-wrapper { background: #000; min-height: 100vh; padding: 20px; font-family: 'Outfit', sans-serif; display: grid; grid-template-columns: 1fr 450px; gap: 20px; }
     
-    .main-grid { display: grid; grid-template-columns: 1fr 400px; gap: 25px; }
+    .inventory-panel { background: #0a0a0a; border-radius: 30px; padding: 25px; border: 1px solid #1a1a1a; }
+    .billing-panel { background: #0d0d0d; border-radius: 30px; padding: 25px; border: 1px solid #D4AF37; position: sticky; top: 20px; height: fit-content; }
 
-    .panel { background: #0a0a0a; border: 1px solid #222; border-radius: 35px; padding: 25px; }
-
-    .item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; max-height: 70vh; overflow-y: auto; }
-    
     .item-card { 
-      background: #111; padding: 15px; border-radius: 20px; border: 1px solid #1a1a1a; 
-      transition: 0.2s; cursor: pointer; text-align: center;
+      background: #111; padding: 15px; border-radius: 20px; text-align: center; border: 1px solid #222; cursor: pointer; transition: 0.2s;
     }
-    .item-card:hover { border-color: #D4AF37; background: #161616; }
+    .item-card:hover { border-color: #D4AF37; transform: scale(1.02); }
 
-    .bill-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #111; }
+    .input-pro { width: 100%; padding: 12px; background: #000; border: 1px solid #333; border-radius: 12px; color: #fff; margin-bottom: 15px; outline: none; }
+    .input-pro:focus { border-color: #D4AF37; }
+
+    .total-display { background: #D4AF37; color: #000; padding: 20px; border-radius: 20px; text-align: center; margin-top: 20px; }
     
-    .charge-input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
-    .charge-box { background: #111; padding: 12px; border-radius: 15px; border: 1px solid #222; }
-    .charge-box label { font-size: 11px; color: #555; text-transform: uppercase; display: block; }
-    .charge-box input { background: transparent; border: none; color: #D4AF37; width: 100%; font-size: 16px; font-weight: 900; outline: none; }
-
-    .btn-checkout { 
-      width: 100%; padding: 20px; background: #D4AF37; color: #000; border: none; 
-      border-radius: 20px; font-weight: 900; font-size: 18px; margin-top: 20px; cursor: pointer;
-      box-shadow: 0 10px 25px rgba(212, 175, 55, 0.2);
+    @media print {
+      .inventory-panel, .input-pro, .btn-main { display: none !important; }
+      .billing-panel { border: none; width: 100%; position: static; color: #000 !important; background: #fff !important; }
+      .pos-wrapper { display: block; background: #fff; }
     }
-
-    @media (max-width: 950px) {
-      .main-grid { grid-template-columns: 1fr; }
-      .panel { border-radius: 25px; }
-    }
+    @media (max-width: 900px) { .pos-wrapper { grid-template-columns: 1fr; } }
   `;
 
   return (
-    <div className="pos-container">
+    <div className="pos-wrapper">
       <style>{styles}</style>
       
-      <div className="main-grid">
-        {/* Left: Inventory Section */}
-        <div className="panel">
-          <h2 style={{marginTop: 0, color: '#D4AF37'}}>INVENTORY TERMINAL</h2>
-          <input 
-            style={{width:'100%', padding:'15px', background:'#111', border:'1px solid #333', borderRadius:'15px', color:'#fff', marginBottom:'20px', fontSize:'16px'}}
-            placeholder="Search items..." onChange={e => setSearchTerm(e.target.value)}
-          />
-          <div className="item-grid">
-            {items.filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
-              <div key={item.id} className="item-card" onClick={() => addToCart(item)}>
-                <div style={{fontWeight:600}}>{item.name}</div>
-                <div style={{color:'#D4AF37', fontWeight:900}}>Rs. {item.retailPrice}</div>
-              </div>
-            ))}
-          </div>
+      <div className="inventory-panel">
+        <h2 style={{color:'#D4AF37', marginTop:0}}>TERMINAL</h2>
+        <input className="input-pro" placeholder="Search product..." onChange={e => setSearchTerm(e.target.value)} />
+        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(130px, 1fr))', gap:'12px'}}>
+          {items.filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
+            <div key={item.id} className="item-card" onClick={() => addToCart(item)}>
+              <div style={{fontWeight:700, fontSize:'14px'}}>{item.name}</div>
+              <div style={{color:'#D4AF37', fontWeight:900}}>Rs. {item.retailPrice}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="billing-panel">
+        <h3 style={{marginTop:0, color:'#D4AF37'}}>BILLING CONSOLE</h3>
+        <input className="input-pro" placeholder="Customer Name" value={customer} onChange={e => setCustomer(e.target.value)} />
+        
+        <div style={{maxHeight:'200px', overflowY:'auto', borderBottom:'1px solid #222'}}>
+          {cart.map((c, i) => (
+            <div key={i} style={{display:'flex', justifyBetween:'space-between', padding:'10px 0'}}>
+              <span style={{flex:1}}>{c.name} x{c.qty}</span>
+              <span style={{fontWeight:900}}>Rs. {c.qty * c.retailPrice}</span>
+            </div>
+          ))}
         </div>
 
-        {/* Right: Detailed Bill Section */}
-        <div className="panel" style={{borderColor: '#D4AF37', background: 'linear-gradient(180deg, #0a0a0a, #000)'}}>
-          <h3 style={{marginTop: 0}}>BILL SUMMARY</h3>
-          <input 
-            style={{width:'100%', padding:'12px', background:'#111', border:'1px solid #333', borderRadius:'12px', color:'#fff', marginBottom:'15px'}}
-            placeholder="Customer Name" value={customerName} onChange={e => setCustomerName(e.target.value)}
-          />
-
-          <div style={{minHeight:'150px', maxHeight:'250px', overflowY:'auto'}}>
-            {cart.map((c, i) => (
-              <div className="bill-row" key={i}>
-                <span>{c.name} <small style={{color:'#444'}}>x{c.quantity}</small></span>
-                <span style={{fontWeight:900}}>Rs. {c.quantity * c.salePrice}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="charge-input-grid">
-            <div className="charge-box"><label>Discount</label><input type="number" onChange={e => setExtraCharges({...extraCharges, discount: e.target.value})} /></div>
-            <div className="charge-box"><label>Labour</label><input type="number" onChange={e => setExtraCharges({...extraCharges, labour: e.target.value})} /></div>
-            <div className="charge-box"><label>Freight</label><input type="number" onChange={e => setExtraCharges({...extraCharges, freight: e.target.value})} /></div>
-          </div>
-
-          <div style={{marginTop:'25px', padding:'20px', background:'#111', borderRadius:'20px', textAlign:'center'}}>
-            <span style={{fontSize:'12px', color:'#555'}}>TOTAL PAYABLE</span>
-            <div style={{fontSize:'32px', fontWeight:900, color:'#D4AF37'}}>Rs. {finalTotal().toLocaleString()}</div>
-          </div>
-
-          <button className="btn-checkout">FINALIZE & PRINT</button>
+        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'10px', marginTop:'15px'}}>
+          <div><label style={{fontSize:'10px'}}>DISC</label><input className="input-pro" type="number" onChange={e => setCharges({...charges, discount: e.target.value})} /></div>
+          <div><label style={{fontSize:'10px'}}>LABOUR</label><input className="input-pro" type="number" onChange={e => setCharges({...charges, labour: e.target.value})} /></div>
+          <div><label style={{fontSize:'10px'}}>FRT</label><input className="input-pro" type="number" onChange={e => setCharges({...charges, freight: e.target.value})} /></div>
         </div>
+
+        <div className="total-display">
+          <div style={{fontSize:'12px', fontWeight:700}}>GRAND TOTAL</div>
+          <div style={{fontSize:'36px', fontWeight:900}}>Rs. {grandTotal.toLocaleString()}</div>
+        </div>
+
+        <button className="btn-main" onClick={handleProcessSale} style={{width:'100%', padding:'20px', background:'#3fb950', border:'none', borderRadius:'20px', color:'#fff', fontWeight:900, fontSize:'18px', marginTop:'15px', cursor:'pointer'}}>
+          SAVE & PRINT BILL
+        </button>
       </div>
     </div>
   );

@@ -61,10 +61,7 @@ const AddItem = ({ editData, onComplete }) => {
     .add-item-container { background-color: #000; min-height: 100vh; padding: 20px; font-family: 'Segoe UI', sans-serif; color: #fff; }
     .layout-grid { display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 25px; max-width: 1200px; margin: 0 auto; }
     
-    /* Adjusted form-card size to be slightly larger than input fields */
     .form-card { background-color: #111; padding: 20px; border-radius: 30px; border: 1px solid #222; display: flex; flex-direction: column; align-items: center; width: fit-content; margin: 0 auto; }
-    
-    /* Inner container width adjusted for better fit */
     .form-inner-container { width: 500px; display: flex; flex-direction: column; padding: 10px; }
     
     .preview-card { background-color: #111; padding: 25px; border-radius: 30px; border: 1px solid #222; text-align: center; position: sticky; top: 20px; height: fit-content; }
@@ -72,7 +69,6 @@ const AddItem = ({ editData, onComplete }) => {
     .input-group-row { display: flex; gap: 15px; width: 100%; margin-bottom: 15px; }
     .input-group-single { width: 100%; margin-bottom: 15px; }
     
-    /* 1.5x larger fields for dropdowns */
     .flex-1-5 { flex: 1.5; }
     .flex-1 { flex: 1; }
     
@@ -84,6 +80,16 @@ const AddItem = ({ editData, onComplete }) => {
     .btn-main { background-color: #f59e0b; color: #000; width: 100%; padding: 18px; border-radius: 15px; border: none; font-weight: 900; cursor: pointer; margin-top: 20px; text-transform: uppercase; font-size: 15px; }
     .btn-top { background-color: #f59e0b; color: #000; border: none; border-radius: 8px; padding: 8px 12px; font-weight: bold; cursor: pointer; font-size: 10px; flex: 1; }
     
+    /* Barcode & QR Data Boxes with 20px Radius */
+    .preview-data-box { 
+      text-align: left; 
+      background: #000; 
+      padding: 12px; 
+      border-radius: 20px; 
+      margin-top: 10px; 
+      border: 2px solid #f59e0b; 
+    }
+
     @media (max-width: 900px) { .layout-grid { grid-template-columns: 1fr; } .form-inner-container { width: 100%; } }
   `;
 
@@ -158,20 +164,40 @@ const AddItem = ({ editData, onComplete }) => {
               <div className="input-group-single"><label className="label-text">Item Name *</label><input className="custom-input" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})} required /></div>
               
               <div className="input-group-row">
+                {/* Searchable Company */}
                 <div className="flex-1-5"><label className="label-text">Company *</label>
-                  <div style={{display:'flex'}}><select className="custom-input" value={formData.company} onChange={e=>setFormData({...formData, company: e.target.value})} required><option value="">Select</option>{companies.map(c=><option key={c} value={c}>{c}</option>)}</select><button type="button" onClick={()=>setCompanies([...companies, prompt("New Company")?.toUpperCase()])} className="btn-plus">+</button></div>
+                  <div style={{display:'flex'}}>
+                    <input list="company-list" className="custom-input" value={formData.company} onChange={e=>setFormData({...formData, company: e.target.value.toUpperCase()})} placeholder="Search/Select" required />
+                    <datalist id="company-list">{companies.map(c=><option key={c} value={c} />)}</datalist>
+                    <button type="button" onClick={()=>setCompanies([...companies, prompt("New Company")?.toUpperCase()])} className="btn-plus">+</button>
+                  </div>
                 </div>
+                {/* Searchable Category */}
                 <div className="flex-1-5"><label className="label-text">Category *</label>
-                  <div style={{display:'flex'}}><select className="custom-input" value={formData.category} onChange={e=>setFormData({...formData, category: e.target.value})} required><option value="">Select</option>{categories.map(c=><option key={c} value={c}>{c}</option>)}</select><button type="button" onClick={()=>setCategories([...categories, prompt("New Category")?.toUpperCase()])} className="btn-plus">+</button></div>
+                  <div style={{display:'flex'}}>
+                    <input list="category-list" className="custom-input" value={formData.category} onChange={e=>setFormData({...formData, category: e.target.value.toUpperCase()})} placeholder="Search/Select" required />
+                    <datalist id="category-list">{categories.map(c=><option key={c} value={c} />)}</datalist>
+                    <button type="button" onClick={()=>setCategories([...categories, prompt("New Category")?.toUpperCase()])} className="btn-plus">+</button>
+                  </div>
                 </div>
               </div>
 
               <div className="input-group-row">
+                {/* Searchable Sub-Category */}
                 <div className="flex-1-5"><label className="label-text">Sub-Category *</label>
-                  <div style={{display:'flex'}}><select className="custom-input" value={formData.subCategory} onChange={e=>setFormData({...formData, subCategory: e.target.value})} required><option value="">Select</option>{subCategories.map(c=><option key={c} value={c}>{c}</option>)}</select><button type="button" onClick={()=>setSubCategories([...subCategories, prompt("New Sub-Category")?.toUpperCase()])} className="btn-plus">+</button></div>
+                  <div style={{display:'flex'}}>
+                    <input list="sub-list" className="custom-input" value={formData.subCategory} onChange={e=>setFormData({...formData, subCategory: e.target.value.toUpperCase()})} placeholder="Search/Select" required />
+                    <datalist id="sub-list">{subCategories.map(c=><option key={c} value={c} />)}</datalist>
+                    <button type="button" onClick={()=>setSubCategories([...subCategories, prompt("New Sub-Category")?.toUpperCase()])} className="btn-plus">+</button>
+                  </div>
                 </div>
+                {/* Searchable Warehouse */}
                 <div className="flex-1-5"><label className="label-text">Warehouse *</label>
-                  <div style={{display:'flex'}}><select className="custom-input" value={formData.warehouse} onChange={e=>setFormData({...formData, warehouse: e.target.value})} required><option value="">Select</option>{warehouses.map(w=><option key={w} value={w}>{w}</option>)}</select><button type="button" onClick={()=>setWarehouses([...warehouses, prompt("New Warehouse")?.toUpperCase()])} className="btn-plus">+</button></div>
+                  <div style={{display:'flex'}}>
+                    <input list="wh-list" className="custom-input" value={formData.warehouse} onChange={e=>setFormData({...formData, warehouse: e.target.value.toUpperCase()})} placeholder="Search/Select" required />
+                    <datalist id="wh-list">{warehouses.map(w=><option key={w} value={w} />)}</datalist>
+                    <button type="button" onClick={()=>setWarehouses([...warehouses, prompt("New Warehouse")?.toUpperCase()])} className="btn-plus">+</button>
+                  </div>
                 </div>
               </div>
 
@@ -218,11 +244,11 @@ const AddItem = ({ editData, onComplete }) => {
             {formData.imageUrl ? <img src={formData.imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="P" /> : <span style={{ color: '#444' }}>IMAGE</span>}
           </div>
           <h3 style={{ fontStyle: 'italic', margin: '15px 0' }}>{formData.name || "PRODUCT NAME"}</h3>
-          <div className="preview-data-box" style={{border:'2px solid #f59e0b'}}>
+          <div className="preview-data-box">
             <label className="label-text" style={{color: '#f59e0b'}}>Barcode Data</label>
             <div style={{fontSize:'10px', color:'#888', wordBreak: 'break-all'}}>{formData.barcodeData}</div>
           </div>
-          <div className="preview-data-box" style={{border:'2px solid #f59e0b'}}>
+          <div className="preview-data-box">
             <label className="label-text" style={{color: '#f59e0b'}}>QR Data</label>
             <div style={{fontSize:'10px', color:'#888', wordBreak: 'break-all'}}>{formData.qrCodeData}</div>
           </div>
@@ -239,9 +265,3 @@ const AddItem = ({ editData, onComplete }) => {
 };
 
 export default AddItem;
-
-
-
-
-
-

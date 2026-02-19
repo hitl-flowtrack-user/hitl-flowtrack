@@ -221,7 +221,7 @@ const AddItem = ({ editData, onComplete }) => {
           <div className="preview-data-box" style={{border:'2px solid #fff'}}>
             <label className="label-text" style={{color: '#f59e0b'}}>Barcode Data</label>
             <div style={{fontSize:'10px', color:'#888', wordBreak: 'break-all'}}>{formData.barcodeData}</div>
-          </div></br>
+          </div>
           <div className="preview-data-box" style={{border:'2px solid #fff'}}>
             <label className="label-text" style={{color: '#f59e0b'}}>QR Data</label>
             <div style={{fontSize:'10px', color:'#888', wordBreak: 'break-all'}}>{formData.qrCodeData}</div>
@@ -239,5 +239,6 @@ const AddItem = ({ editData, onComplete }) => {
 };
 
 export default AddItem;
+
 
 

@@ -24,7 +24,7 @@ const InventoryView = () => {
     .view-toggle { background: #f59e0b; color: #000; padding: 10px 20px; border-radius: 10px; font-weight: bold; cursor: pointer; border: none; }
     
     .grid-view { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
-    .item-card { background: #111; padding: 20px; border-radius: 25px; border: 1px solid #222; text-align: center; }
+    .item-card { background: #00ffde57; padding: 20px; border-radius: 25px; border: 1px solid #222; text-align: center; }
     
     .list-view { width: 100%; border-collapse: collapse; background: #111; border-radius: 15px; overflow: hidden; }
     .list-view th { background: #f59e0b; color: #000; padding: 12px; text-align: left; }
@@ -199,3 +199,4 @@ const InventoryView = () => {
 };
 
 export default InventoryView;
+

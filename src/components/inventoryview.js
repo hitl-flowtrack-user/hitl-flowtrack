@@ -25,6 +25,15 @@ const InventoryView = ({ onEdit }) => {
     }
   };
 
+  // Improved Edit Handler
+  const handleEdit = (item) => {
+    if (onEdit) {
+      onEdit(item);
+    } else {
+      console.error("onEdit function is not provided as a prop.");
+    }
+  };
+
   const downloadQR = (id) => {
     const svg = document.getElementById(`qr-${id}`);
     if (!svg) return;
@@ -35,21 +44,19 @@ const InventoryView = ({ onEdit }) => {
     const img = new Image();
     
     img.onload = () => {
-      const scaleFactor = 5; // 5x High Quality
-      canvas.width = 500;
-      canvas.height = 500;
+      const scaleFactor = 5; 
+      canvas.width = 600; // Increased size for more data clarity
+      canvas.height = 600;
       
-      // White Background & Border
       ctx.fillStyle = "white";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       
-      // Draw QR with padding
-      const padding = 40;
+      const padding = 50;
       ctx.drawImage(img, padding, padding, canvas.width - (padding * 2), canvas.height - (padding * 2));
       
       const pngFile = canvas.toDataURL("image/png", 1.0);
       const downloadLink = document.createElement("a");
-      downloadLink.download = `QR-${id}.png`;
+      downloadLink.download = `QR-FullData-${id}.png`;
       downloadLink.href = pngFile;
       downloadLink.click();
     };
@@ -61,7 +68,6 @@ const InventoryView = ({ onEdit }) => {
     item.sku?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Calculations for Restored Stats
   const totalBoxes = items.reduce((a, c) => a + (parseFloat(c.openingStock) || 0), 0);
   const totalPcs = items.reduce((a, c) => a + (parseFloat(c.totalPcs) || 0), 0);
   const totalWeight = items.reduce((a, c) => a + (parseFloat(c.totalWeight) || 0), 0);
@@ -99,7 +105,6 @@ const InventoryView = ({ onEdit }) => {
         <input type="text" className="search-bar" placeholder="Search product..." onChange={(e) => setSearchTerm(e.target.value)} />
       </div>
 
-      {/* Restored Stats Section */}
       <div className="stat-grid">
         <div className="stat-card"><span className="stat-val">{items.length}</span><span className="stat-label">Total Items</span></div>
         <div className="stat-card"><span className="stat-val">{totalBoxes} / {totalPcs}</span><span className="stat-label">Boxes / Total Pcs</span></div>
@@ -122,40 +127,45 @@ const InventoryView = ({ onEdit }) => {
               </tr>
             </thead>
             <tbody>
-              {filteredItems.map((item) => (
-                <tr key={item.id}>
-                  <td><img src={item.imageUrl} alt="img" style={{width:'60px', height:'60px', borderRadius:'8px', objectFit:'cover'}} /></td>
-                  <td>
-                    <div style={{fontWeight:'bold', color:'#f59e0b'}}>{item.name}</div>
-                    <div style={{fontSize:'12px', color:'#888'}}>{item.sku}</div>
-                    <div style={{fontSize:'11px', color:'#666'}}>{item.warehouse}</div>
-                  </td>
-                  <td>
-                    <div className="qr-box" onClick={() => downloadQR(item.id)}>
-                      <QRCodeSVG 
-                        id={`qr-${item.id}`} 
-                        value={`ITEM:${item.name}|PCS/B:${item.pcsPerBox}|WH:${item.warehouse}`} 
-                        size={50} 
-                        level="H" 
-                      />
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{fontWeight:'bold'}}>{item.openingStock} Boxes</div>
-                    <div style={{fontSize:'12px', color:'#f59e0b'}}>{item.totalPcs} Pcs</div>
-                    <div style={{fontSize:'11px', color:'#777'}}>{item.totalWeight} KG Total</div>
-                  </td>
-                  <td>
-                    <div style={{fontSize:'13px'}}>P: {item.purchasePrice}</div>
-                    <div style={{fontSize:'13px'}}>T: {item.tradePrice}</div>
-                    <div style={{fontSize:'13px', color:'#f59e0b', fontWeight:'bold'}}>R: {item.retailPrice}</div>
-                  </td>
-                  <td>
-                    <button className="action-btn edit-btn" onClick={() => onEdit(item)}>EDIT</button>
-                    <button className="action-btn delete-btn" onClick={() => handleDelete(item.id)}>DEL</button>
-                  </td>
-                </tr>
-              ))}
+              {filteredItems.map((item) => {
+                // Extended Data for QR Code
+                const qrValue = `SR#:${item.srNo}|ITEM:${item.name}|CO:${item.company || 'N/A'}|WH:${item.warehouse}|PCS:${item.pcsPerBox}|VOL:${item.length}x${item.width}x${item.height}|WT:${item.weightKg}KG|PUR:${item.purchasePrice}`;
+
+                return (
+                  <tr key={item.id}>
+                    <td><img src={item.imageUrl} alt="img" style={{width:'60px', height:'60px', borderRadius:'8px', objectFit:'cover'}} /></td>
+                    <td>
+                      <div style={{fontWeight:'bold', color:'#f59e0b'}}>{item.name}</div>
+                      <div style={{fontSize:'12px', color:'#888'}}>{item.sku}</div>
+                      <div style={{fontSize:'11px', color:'#666'}}>{item.warehouse}</div>
+                    </td>
+                    <td>
+                      <div className="qr-box" onClick={() => downloadQR(item.id)}>
+                        <QRCodeSVG 
+                          id={`qr-${item.id}`} 
+                          value={qrValue} 
+                          size={55} 
+                          level="H" 
+                        />
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{fontWeight:'bold'}}>{item.openingStock} Boxes</div>
+                      <div style={{fontSize:'12px', color:'#f59e0b'}}>{item.totalPcs} Pcs</div>
+                      <div style={{fontSize:'11px', color:'#777'}}>{item.totalWeight} KG Total</div>
+                    </td>
+                    <td>
+                      <div style={{fontSize:'13px'}}>P: {item.purchasePrice}</div>
+                      <div style={{fontSize:'13px'}}>T: {item.tradePrice}</div>
+                      <div style={{fontSize:'13px', color:'#f59e0b', fontWeight:'bold'}}>R: {item.retailPrice}</div>
+                    </td>
+                    <td>
+                      <button className="action-btn edit-btn" onClick={() => handleEdit(item)}>EDIT</button>
+                      <button className="action-btn delete-btn" onClick={() => handleDelete(item.id)}>DEL</button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

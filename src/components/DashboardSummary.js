@@ -24,167 +24,125 @@ const DashboardSummary = () => {
   const styles = `
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
     
-    .dashboard-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      grid-template-rows: auto 180px 350px;
-      gap: 20px;
-      padding: 30px;
-      background-color: #050505;
-      min-height: 100vh;
-      font-family: 'Outfit', sans-serif;
-      color: #fff;
+    .dashboard-container {
+      padding: 40px; background: #000; min-height: 100vh;
+      font-family: 'Outfit', sans-serif; color: #fff;
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 25px;
     }
 
-    /* Top Welcome Bar */
-    .welcome-bar {
-      grid-column: span 4;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
+    .header-area {
+      grid-column: span 4; display: flex; justify-content: space-between; align-items: flex-end;
+      margin-bottom: 20px; border-bottom: 1px solid #111; padding-bottom: 20px;
     }
 
-    /* Premium Glow Card Base */
-    .bento-card {
-      background: rgba(18, 18, 18, 0.6);
-      border: 1px solid rgba(212, 175, 55, 0.15);
-      border-radius: 28px;
-      padding: 25px;
-      backdrop-filter: blur(12px);
-      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      position: relative;
-      overflow: hidden;
+    .premium-card {
+      background: linear-gradient(145deg, #0a0a0a, #111);
+      border: 1px solid rgba(212, 175, 55, 0.1);
+      border-radius: 35px; padding: 30px; position: relative;
+      transition: 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
     }
-    .bento-card:hover {
-      border-color: #D4AF37;
-      box-shadow: 0 10px 40px rgba(212, 175, 55, 0.1);
-      transform: translateY(-5px);
+    .premium-card:hover {
+      border-color: #D4AF37; transform: scale(1.02);
+      box-shadow: 0 20px 60px rgba(212, 175, 55, 0.08);
     }
 
-    /* Hero Card (Large Revenue) */
-    .hero-card {
-      grid-column: span 2;
-      grid-row: span 1;
-      background: linear-gradient(135deg, #111 0%, #050505 100%);
-      border-left: 5px solid #D4AF37;
-    }
-
-    /* Statistics Labels */
-    .label { color: #666; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; }
-    .amount { font-size: 38px; font-weight: 800; color: #D4AF37; margin-top: 10px; display: block; }
+    .main-stat { grid-column: span 2; grid-row: span 1; }
     
-    /* Charts/Visual Placeholders */
-    .visual-glow {
-      position: absolute; bottom: -20px; right: -20px;
-      width: 150px; height: 150px;
-      background: radial-gradient(circle, rgba(212, 175, 55, 0.1) 0%, transparent 70%);
+    .gold-accent { color: #D4AF37; font-weight: 800; }
+    .stat-title { color: #555; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; font-weight: 600; }
+    .stat-value { font-size: 48px; font-weight: 800; margin: 15px 0; display: block; }
+    
+    .chart-stub {
+      height: 60px; width: 100%; background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.1), transparent);
+      border-radius: 15px; margin-top: 20px; position: relative; overflow: hidden;
+    }
+    .chart-stub::after {
+      content: ''; position: absolute; left: 0; top: 50%; width: 100%; height: 2px;
+      background: #D4AF37; box-shadow: 0 0 15px #D4AF37;
     }
 
-    /* Lists */
-    .activity-list {
-      grid-column: span 2;
-      grid-row: span 1;
-      overflow-y: auto;
+    .list-panel { grid-column: span 2; background: #080808; border-radius: 35px; padding: 30px; border: 1px solid #111; }
+    
+    .data-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 18px; background: #0c0c0c; border-radius: 20px; margin-bottom: 12px;
+      border: 1px solid transparent; transition: 0.3s;
     }
-    .item-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 15px;
-      margin-bottom: 10px;
-      background: rgba(255,255,255,0.02);
-      border-radius: 18px;
-      border: 1px solid rgba(255,255,255,0.03);
-    }
-    .item-row:hover { background: rgba(212, 175, 55, 0.05); }
+    .data-row:hover { border-color: rgba(212, 175, 55, 0.2); background: #111; }
 
-    /* Tags */
-    .status-tag {
-      background: rgba(212, 175, 55, 0.1);
-      color: #D4AF37;
-      padding: 5px 12px;
-      border-radius: 10px;
-      font-size: 11px;
-      font-weight: 800;
-      border: 1px solid rgba(212, 175, 55, 0.3);
-    }
-
-    /* Mini Progress */
-    .progress-container { width: 100%; height: 6px; background: #1a1a1a; border-radius: 10px; margin-top: 15px; }
-    .progress-bar { height: 100%; background: #D4AF37; border-radius: 10px; box-shadow: 0 0 10px #D4AF37; }
+    .indicator { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 10px; }
   `;
 
-  if (loading) return <div style={{background:'#050505', color:'#D4AF37', height:'100vh', display:'flex', alignItems:'center', justifyContent:'center'}}>
-    <h2 style={{fontFamily:'Outfit'}}>LOADING PREMIER ANALYTICS...</h2>
-  </div>;
+  if (loading) return <div style={{background:'#000', height:'100vh', display:'flex', justifyContent:'center', alignItems:'center', color:'#D4AF37', fontFamily:'Outfit'}}>INITIALIZING...</div>;
 
   return (
-    <div className="dashboard-grid">
+    <div className="dashboard-container">
       <style>{styles}</style>
       
-      {/* Top Section */}
-      <div className="welcome-bar">
+      {/* 1. Dynamic Header */}
+      <div className="header-area">
         <div>
-          <h1 style={{margin:0, fontWeight: 800, fontSize: '32px'}}>COMMAND <span style={{color:'#D4AF37'}}>CENTER</span></h1>
-          <p style={{color:'#444', margin:0, fontWeight: 400}}>Overview of your business performance & stock.</p>
+          <span className="gold-accent" style={{letterSpacing: '5px'}}>PREMIUM ACCESS</span>
+          <h1 style={{margin:'5px 0 0 0', fontSize:'40px', fontWeight: 800}}>COMMAND <span className="gold-accent">CENTER</span></h1>
         </div>
-        <div style={{background:'#111', padding:'10px 20px', borderRadius:'15px', border:'1px solid #222'}}>
-          <span style={{color:'#666', fontSize:'12px'}}>DATE:</span> <span style={{fontWeight:'bold'}}>{new Date().toLocaleDateString()}</span>
+        <div style={{textAlign:'right'}}>
+          <div style={{fontSize:'12px', color:'#444'}}>SYSTEM STATUS</div>
+          <div style={{color:'#3fb950', fontWeight:'bold'}}><span className="indicator" style={{background:'#3fb950'}}></span>ONLINE</div>
         </div>
       </div>
 
-      {/* Row 1: Big Stats */}
-      <div className="bento-card hero-card">
-        <span className="label">Total Revenue</span>
-        <span className="amount">Rs. {totalRevenue.toLocaleString()}</span>
-        <div className="progress-container"><div className="progress-bar" style={{width:'70%'}}></div></div>
-        <p style={{fontSize:'12px', color:'#3fb950', marginTop:'10px'}}>+ 18% Increase from last week</p>
-        <div className="visual-glow"></div>
+      {/* 2. Top Large Metrics */}
+      <div className="premium-card main-stat">
+        <span className="stat-title">Gross Revenue (Total)</span>
+        <span className="stat-value">Rs. {totalRevenue.toLocaleString()}<span style={{fontSize:'18px', color:'#3fb950', marginLeft:'15px'}}>+12%</span></span>
+        <div className="chart-stub"></div>
       </div>
 
-      <div className="bento-card">
-        <span className="label">Inventory Value</span>
-        <span className="amount" style={{fontSize:'28px'}}>Rs. {totalStockVal.toLocaleString()}</span>
-        <div className="progress-container"><div className="progress-bar" style={{width:'45%', background:'#666', boxShadow:'none'}}></div></div>
-        <div className="visual-glow"></div>
+      <div className="premium-card">
+        <span className="stat-title">Inventory Net Worth</span>
+        <span className="stat-value" style={{fontSize:'32px'}}>Rs. {totalStockVal.toLocaleString()}</span>
+        <p style={{color:'#444', fontSize:'12px', margin:0}}>Based on purchase prices</p>
       </div>
 
-      <div className="bento-card">
-        <span className="label">Total Invoices</span>
-        <span className="amount" style={{fontSize:'28px'}}>{sales.length}</span>
-        <span className="status-tag" style={{marginTop:'10px', display:'inline-block'}}>ACTIVE SALES</span>
+      <div className="premium-card">
+        <span className="stat-title">Total Transactions</span>
+        <span className="stat-value" style={{fontSize:'32px'}}>{sales.length}</span>
+        <div style={{display:'flex', gap:'5px'}}>
+            <div style={{width:'20%', height:'4px', background:'#D4AF37', borderRadius:'10px'}}></div>
+            <div style={{width:'80%', height:'4px', background:'#222', borderRadius:'10px'}}></div>
+        </div>
       </div>
 
-      {/* Row 2: Detailed Lists */}
-      <div className="bento-card activity-list">
-        <h3 style={{margin:'0 0 20px 0', fontSize:'18px', color:'#D4AF37'}}>LATEST TRANSACTIONS</h3>
+      {/* 3. Bottom Panels */}
+      <div className="list-panel">
+        <h3 style={{marginTop:0, marginBottom:'25px', fontSize:'18px'}} className="gold-accent">LIVE FEED</h3>
         {sales.slice(0, 4).map((sale, i) => (
-          <div className="item-row" key={i}>
+          <div className="data-row" key={i}>
             <div>
-              <div style={{fontWeight:600, fontSize:'14px'}}>{sale.customerName}</div>
+              <div style={{fontWeight: 600}}>{sale.customerName}</div>
               <div style={{fontSize:'11px', color:'#444'}}>{new Date().toLocaleTimeString()}</div>
             </div>
             <div style={{textAlign:'right'}}>
-              <div style={{fontWeight:800, color:'#D4AF37'}}>Rs. {sale.totalAmount}</div>
-              <div style={{fontSize:'9px', color:'#3fb950'}}>PAID</div>
+              <div className="gold-accent" style={{fontSize:'16px'}}>Rs. {sale.totalAmount}</div>
+              <div style={{fontSize:'10px', color:'#3fb950'}}>CONFIRMED</div>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="bento-card activity-list">
-        <h3 style={{margin:'0 0 20px 0', fontSize:'18px', color:'#D4AF37'}}>CRITICAL STOCK</h3>
+      <div className="list-panel">
+        <h3 style={{marginTop:0, marginBottom:'25px', fontSize:'18px'}} className="gold-accent">INVENTORY ALERT</h3>
         {items.filter(item => (parseFloat(item.openingStock) || 0) < 10).slice(0, 4).map((item, i) => (
-          <div className="item-row" key={i} style={{borderLeft: '4px solid #ef4444'}}>
+          <div className="data-row" key={i} style={{borderLeft: '4px solid #ef4444'}}>
             <div>
-              <div style={{fontWeight:600, fontSize:'14px'}}>{item.name}</div>
-              <div style={{fontSize:'11px', color:'#444'}}>WH: {item.warehouse}</div>
+              <div style={{fontWeight: 600}}>{item.name}</div>
+              <div style={{fontSize:'11px', color:'#444'}}>Stock Ref: {item.sku || 'N/A'}</div>
             </div>
-            <div style={{color:'#ef4444', fontWeight:'bold'}}>{item.openingStock} Box</div>
+            <div style={{color:'#ef4444', fontWeight:'bold'}}>{item.openingStock} Left</div>
           </div>
         ))}
       </div>
+
     </div>
   );
 };

@@ -8,7 +8,6 @@ const AddItem = ({ editData, onComplete }) => {
   const excelInputRef = useRef(null);
   const [statusMessage, setStatusMessage] = useState('');
   
-  // Dynamic states for searchable dropdowns
   const [companies, setCompanies] = useState([]);
   const [categories, setCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
@@ -27,7 +26,7 @@ const AddItem = ({ editData, onComplete }) => {
 
   const [formData, setFormData] = useState(initialFormState);
 
-  // Fetch unique values from Firestore for searchable dropdowns
+  // Fetch unique values for searchable dropdowns
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "inventory_records"), (snapshot) => {
       const docs = snapshot.docs.map(doc => doc.data());
@@ -51,7 +50,7 @@ const AddItem = ({ editData, onComplete }) => {
     else { setFormData(initialFormState); }
   }, [editData]);
 
-  // Calculations Logic
+  // Real-time Calculations
   useEffect(() => {
     const stock = parseFloat(formData.openingStock) || 0;
     const pcsBox = parseFloat(formData.pcsPerBox) || 0;
@@ -81,30 +80,31 @@ const AddItem = ({ editData, onComplete }) => {
   const styles = `
     .add-item-container { background-color: #000; min-height: 100vh; padding: 20px; font-family: 'Segoe UI', sans-serif; color: #fff; }
     .layout-grid { display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 25px; max-width: 1200px; margin: 0 auto; }
-    
     .form-card { background-color: #111; padding: 20px; border-radius: 30px; border: 1px solid #222; display: flex; flex-direction: column; align-items: center; width: fit-content; margin: 0 auto; }
     .form-inner-container { width: 500px; display: flex; flex-direction: column; padding: 10px; }
-    
     .preview-card { background-color: #111; padding: 25px; border-radius: 30px; border: 1px solid #222; text-align: center; position: sticky; top: 20px; height: fit-content; }
-    
     .input-group-row { display: flex; gap: 15px; width: 100%; margin-bottom: 15px; }
     .input-group-single { width: 100%; margin-bottom: 15px; }
-    
     .flex-1-5 { flex: 1.5; }
     .flex-1 { flex: 1; }
-    
     .label-text { display: block; color: #9ca3af; font-size: 11px; margin-bottom: 6px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; }
     .custom-input { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #333; background-color: #fff; color: #000; font-size: 14px; outline: none; box-sizing: border-box; }
     .readonly-input { width: 100%; padding: 12px; border-radius: 10px; border: none; background-color: #1a1a1a; color: #f59e0b; font-size: 13px; font-weight: bold; box-sizing: border-box; }
-    
     .btn-plus { background-color: #f59e0b; color: #000; width: 45px; height: 42px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-left: 5px; font-size: 20px; display: flex; align-items: center; justify-content: center; }
     .btn-main { background-color: #f59e0b; color: #000; width: 100%; padding: 18px; border-radius: 15px; border: none; font-weight: 900; cursor: pointer; margin-top: 20px; text-transform: uppercase; font-size: 15px; }
     .btn-top { background-color: #f59e0b; color: #000; border: none; border-radius: 8px; padding: 8px 12px; font-weight: bold; cursor: pointer; font-size: 10px; flex: 1; }
-    
     .preview-data-box { text-align: left; background: #000; padding: 12px; border-radius: 20px; margin-top: 10px; border: 2px solid #f59e0b; }
-
     @media (max-width: 900px) { .layout-grid { grid-template-columns: 1fr; } .form-inner-container { width: 100%; } }
   `;
+
+  // Download Template Logic
+  const downloadTemplate = () => {
+    const headers = [["Item Name", "Company", "Category", "Sub-Category", "Warehouse", "Opening Stock", "Pcs Per Box", "Weight KG", "Length", "Width", "Height", "Purchase Price", "Trade Price", "Retail Price", "Min Stock", "Max Stock"]];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "InventoryTemplate");
+    XLSX.writeFile(wb, "Inventory_Import_Template.xlsx");
+  };
 
   const handleExcelImport = (e) => {
     const file = e.target.files[0];
@@ -124,6 +124,7 @@ const AddItem = ({ editData, onComplete }) => {
           const name = (item["Item Name"] || "UNKNOWN").toUpperCase();
           const openStock = parseFloat(item["Opening Stock"]) || 0;
           const wt = parseFloat(item["Weight KG"]) || 0;
+          const pBox = parseFloat(item["Pcs Per Box"]) || 0;
           
           batch.set(newDocRef, {
             name, srNo: sr, sku: `${name.substring(0, 3)}-${sr}`,
@@ -131,10 +132,13 @@ const AddItem = ({ editData, onComplete }) => {
             category: (item["Category"] || "GENERAL").toUpperCase(),
             subCategory: (item["Sub-Category"] || "STANDARD").toUpperCase(),
             warehouse: (item["Warehouse"] || "MAIN STORE").toUpperCase(),
-            pcsPerBox: parseFloat(item["Pcs Per Box"]) || 0,
+            pcsPerBox: pBox,
             openingStock: openStock,
-            totalPcs: openStock * (parseFloat(item["Pcs Per Box"]) || 0),
+            totalPcs: openStock * pBox,
             totalWeight: (openStock * wt).toFixed(2),
+            length: item["Length"] || '0',
+            width: item["Width"] || '0',
+            height: item["Height"] || '0',
             weightKg: wt,
             purchasePrice: item["Purchase Price"] || 0,
             tradePrice: item["Trade Price"] || 0,
@@ -242,7 +246,7 @@ const AddItem = ({ editData, onComplete }) => {
 
         <div className="preview-card">
           <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-            <button type="button" className="btn-top">Template</button>
+            <button type="button" className="btn-top" onClick={downloadTemplate}>Template</button>
             <button type="button" className="btn-top" onClick={() => excelInputRef.current.click()}>Excel Import</button>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>

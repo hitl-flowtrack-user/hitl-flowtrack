@@ -12,10 +12,8 @@ const SalesModule = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [history, setHistory] = useState([]);
   const [nextInvoiceNo, setNextInvoiceNo] = useState('');
-  
-  // New States for Printing
   const [printSize, setPrintSize] = useState('A5'); 
-  const [activePrintBill, setActivePrintBill] = useState(null); // For Re-printing
+  const [activePrintBill, setActivePrintBill] = useState(null); 
 
   useEffect(() => {
     setNextInvoiceNo(`INV-${Date.now().toString().slice(-6)}`);
@@ -54,30 +52,34 @@ const SalesModule = () => {
 
     try {
       await addDoc(collection(db, "sales_records"), { ...currentData, createdAt: serverTimestamp() });
-      setActivePrintBill(currentData); // Set this as the bill to print
       
+      // CRITICAL FIX: Set data for printing FIRST
+      setActivePrintBill(currentData); 
+
+      // Give browser time to render the hidden print-area
       setTimeout(() => {
         window.print();
+        
+        // Clear AFTER print dialog
         setCart([]);
         setCustomer('');
         setCharges({ discount: 0, labour: 0, freight: 0 });
         setNextInvoiceNo(`INV-${Date.now().toString().slice(-6)}`);
         setIsProcessing(false);
-        setActivePrintBill(null);
-      }, 700);
+        setActivePrintBill(null); 
+      }, 1000);
     } catch(e) { 
       alert("Error: " + e.message);
       setIsProcessing(false);
     }
   };
 
-  // Re-print from History
   const rePrint = (bill) => {
     setActivePrintBill(bill);
     setTimeout(() => {
       window.print();
       setActivePrintBill(null);
-    }, 500);
+    }, 800);
   };
 
   const styles = `
@@ -85,30 +87,37 @@ const SalesModule = () => {
     .panel { background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 15px; padding: 20px; display: flex; flex-direction: column; }
     .gold { color: #D4AF37; }
     .input-ui { width: 100%; padding: 12px; background: #000; border: 1px solid #333; border-radius: 8px; color: #fff; margin-bottom: 10px; box-sizing: border-box; }
-    
-    .hist-scroll { flex-grow: 1; overflow-y: auto; margin-top: 15px; border-top: 1px solid #222; padding-top: 10px; }
-    .hist-card { background: #111; padding: 10px; border-radius: 10px; margin-bottom: 8px; cursor: pointer; border-left: 4px solid #D4AF37; display: flex; justify-content: space-between; transition: 0.3s; }
-    .hist-card:hover { background: #1a1a1a; transform: scale(1.02); }
+    .hist-card { background: #111; padding: 10px; border-radius: 10px; margin-bottom: 8px; cursor: pointer; border-left: 4px solid #D4AF37; display: flex; justify-content: space-between; }
 
-    /* PRINT LAYOUTS */
+    /* ULTIMATE PRINT FIX */
     @media print {
-      .pos-wrapper, .no-print { display: none !important; }
-      #print-area { display: block !important; background: #fff !important; color: #000 !important; margin: 0 auto; padding: 20px; }
+      body * { visibility: hidden !important; }
+      #final-print-zone, #final-print-zone * { visibility: visible !important; }
+      #final-print-zone { 
+        position: absolute !important; 
+        left: 0 !important; 
+        top: 0 !important; 
+        width: 100% !important; 
+        display: block !important; 
+        background: white !important; 
+        color: black !important; 
+        padding: 20px !important;
+      }
       .A4 { width: 210mm; min-height: 297mm; }
       .A5 { width: 148mm; min-height: 210mm; }
     }
-    #print-area { display: none; }
+    #final-print-zone { display: none; }
   `;
 
   return (
     <div className="pos-wrapper">
       <style>{styles}</style>
 
-      {/* LEFT SIDE */}
+      {/* LEFT PANEL */}
       <div className="panel">
         <div style={{display:'flex', justifyContent:'space-between', marginBottom:'15px'}}>
-          <h2 className="gold">SALE TERMINAL</h2>
-          <input value={userName} onChange={(e)=>setUserName(e.target.value)} style={{background:'none', border:'none', color:'#D4AF37', fontWeight:'bold', textAlign:'right'}} />
+          <h2 className="gold">TERMINAL</h2>
+          <div style={{fontSize:'12px'}}>USER: <input value={userName} onChange={(e)=>setUserName(e.target.value)} style={{background:'none', border:'none', color:'#D4AF37', fontWeight:'bold', width:'80px'}} /></div>
         </div>
 
         <div style={{display:'flex', gap:'10px', marginBottom:'15px'}}>
@@ -122,23 +131,22 @@ const SalesModule = () => {
         <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(120px, 1fr))', gap:'10px', overflowY:'auto'}}>
           {items.filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
             <div key={item.id} style={{background:'#111', padding:'15px', borderRadius:'10px', cursor:'pointer', border:'1px solid #222', textAlign:'center'}} onClick={() => addToCart(item)}>
-              <div style={{fontWeight:'bold'}}>{item.name}</div>
-              <div className="gold">Rs. {item.retailPrice}</div>
+              <strong>{item.name}</strong><br/><span className="gold">Rs. {item.retailPrice}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* RIGHT SIDE */}
+      {/* RIGHT PANEL */}
       <div className="panel" style={{borderColor: '#D4AF37', height: 'calc(100vh - 40px)'}}>
-        <h3 className="gold" style={{marginTop:0}}>BILL DETAILS</h3>
+        <h3 className="gold" style={{marginTop:0}}>BILLING</h3>
         <input className="input-ui" placeholder="Customer Name" value={customer} onChange={e => setCustomer(e.target.value)} />
         
-        <div style={{height:'150px', overflowY:'auto', background:'#000', padding:'10px', borderRadius:'8px', marginBottom:'10px'}}>
+        <div style={{height:'150px', overflowY:'auto', background:'#000', padding:'10px', borderRadius:'8px', marginBottom:'10px', border:'1px solid #111'}}>
           {cart.map((c, i) => (
-            <div key={i} style={{display:'flex', justifyContent:'space-between', fontSize:'13px', padding:'4px 0', borderBottom:'1px solid #111'}}>
+            <div key={i} style={{display:'flex', justifyContent:'space-between', fontSize:'13px', padding:'5px 0', borderBottom:'1px solid #111'}}>
               <span>{c.name} x{c.qty}</span>
-              <span className="gold">{c.qty * c.retailPrice}</span>
+              <span>{c.qty * c.retailPrice}</span>
             </div>
           ))}
         </div>
@@ -154,42 +162,35 @@ const SalesModule = () => {
         </div>
 
         <button onClick={handleSaveAndPrint} disabled={isProcessing} style={{width:'100%', padding:'15px', background:'#3fb950', border:'none', borderRadius:'10px', color:'#fff', fontWeight:'bold', marginTop:'10px', cursor:'pointer'}}>
-          {isProcessing ? "SAVING..." : `SAVE & PRINT (${printSize})`}
+          {isProcessing ? "SAVING..." : `PRINT ${printSize} BILL`}
         </button>
 
-        <div className="hist-scroll">
-          <small style={{color:'#444'}}>CLICK TO RE-PRINT PREVIOUS BILLS</small>
+        <div style={{flexGrow:1, overflowY:'auto', marginTop:'15px', borderTop:'1px solid #222', paddingTop:'10px'}}>
+          <small style={{color:'#444'}}>RECENT BILLS (CLICK TO REPRINT)</small>
           {history.map((h, idx) => (
             <div key={idx} className="hist-card" onClick={() => rePrint(h)}>
-              <div style={{fontSize:'12px'}}>
-                <strong>{h.customerName}</strong><br/>
-                <small style={{color:'#555'}}>{h.invoiceNo}</small>
-              </div>
-              <div style={{textAlign:'right', fontWeight:'bold'}} className="gold">
-                Rs. {h.totalAmount}<br/>
-                <small style={{fontSize:'9px', color:'#333'}}>{h.timeString}</small>
-              </div>
+              <span style={{fontSize:'12px'}}><strong>{h.customerName}</strong><br/>{h.invoiceNo}</span>
+              <span className="gold" style={{fontWeight:'bold'}}>Rs. {h.totalAmount}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* --- UNIVERSAL PRINT AREA (A4/A5) --- */}
+      {/* --- HIDDEN PRINT AREA --- */}
       {activePrintBill && (
-        <div id="print-area" className={printSize}>
+        <div id="final-print-zone" className={printSize}>
           <div style={{textAlign:'center', borderBottom:'2px solid #000', paddingBottom:'10px'}}>
             <h1 style={{margin:0}}>PREMIUM CERAMICS</h1>
-            <p style={{margin:0}}>Jaranwala Road | 0300-1234567</p>
+            <p style={{margin:0}}>Official Sale Invoice | Jaranwala Road</p>
           </div>
 
           <div style={{display:'flex', justifyContent:'space-between', marginTop:'20px', borderBottom:'1px solid #eee', paddingBottom:'10px'}}>
             <div>
-              <strong>INVOICE TO:</strong><br/>
-              {activePrintBill.customerName}<br/>
-              User: {activePrintBill.processedBy}
+              <strong>CUSTOMER:</strong> {activePrintBill.customerName}<br/>
+              <strong>USER:</strong> {activePrintBill.processedBy}
             </div>
             <div style={{textAlign:'right'}}>
-              <strong>INV NO:</strong> {activePrintBill.invoiceNo}<br/>
+              <strong>INV:</strong> {activePrintBill.invoiceNo}<br/>
               <strong>DATE:</strong> {activePrintBill.dateString}<br/>
               <strong>TIME:</strong> {activePrintBill.timeString}
             </div>
@@ -198,33 +199,32 @@ const SalesModule = () => {
           <table style={{width:'100%', marginTop:'20px', borderCollapse:'collapse'}}>
             <thead>
               <tr style={{background:'#f5f5f5'}}>
-                <th style={{border:'1px solid #ddd', padding:'10px', textAlign:'left'}}>Description</th>
-                <th style={{border:'1px solid #ddd', padding:'10px', textAlign:'center'}}>Qty</th>
-                <th style={{border:'1px solid #ddd', padding:'10px', textAlign:'right'}}>Total</th>
+                <th style={{border:'1px solid #000', padding:'8px', textAlign:'left'}}>Item</th>
+                <th style={{border:'1px solid #000', padding:'8px', textAlign:'center'}}>Qty</th>
+                <th style={{border:'1px solid #000', padding:'8px', textAlign:'right'}}>Total</th>
               </tr>
             </thead>
             <tbody>
               {activePrintBill.cart.map((item, i) => (
                 <tr key={i}>
-                  <td style={{border:'1px solid #ddd', padding:'10px'}}>{item.name}</td>
-                  <td style={{border:'1px solid #ddd', padding:'10px', textAlign:'center'}}>{item.qty}</td>
-                  <td style={{border:'1px solid #ddd', padding:'10px', textAlign:'right'}}>{item.qty * item.retailPrice}</td>
+                  <td style={{border:'1px solid #000', padding:'8px'}}>{item.name}</td>
+                  <td style={{border:'1px solid #000', padding:'8px', textAlign:'center'}}>{item.qty}</td>
+                  <td style={{border:'1px solid #000', padding:'8px', textAlign:'right'}}>{item.qty * item.retailPrice}</td>
                 </tr>
               ))}
             </tbody>
           </table>
 
           <div style={{marginTop:'20px', float:'right', width:'250px'}}>
-            <div style={{display:'flex', justifyContent:'space-between', padding:'5px'}}><span>Sub Total:</span><span>Rs. {activePrintBill.subTotal}</span></div>
-            <div style={{display:'flex', justifyContent:'space-between', padding:'5px'}}><span>Labour/Frt:</span><span>Rs. {parseFloat(activePrintBill.labour||0) + parseFloat(activePrintBill.freight||0)}</span></div>
-            <div style={{display:'flex', justifyContent:'space-between', padding:'5px'}}><span>Discount:</span><span>- Rs. {activePrintBill.discount||0}</span></div>
-            <div style={{display:'flex', justifyContent:'space-between', padding:'10px', background:'#f5f5f5', fontWeight:'bold', fontSize:'18px', marginTop:'5px'}}>
+            <div style={{display:'flex', justifyContent:'space-between'}}><span>Sub Total:</span><span>Rs. {activePrintBill.subTotal}</span></div>
+            <div style={{display:'flex', justifyContent:'space-between'}}><span>Service/Frt:</span><span>Rs. {parseFloat(activePrintBill.labour||0) + parseFloat(activePrintBill.freight||0)}</span></div>
+            <div style={{display:'flex', justifyContent:'space-between'}}><span>Discount:</span><span>- Rs. {activePrintBill.discount||0}</span></div>
+            <div style={{display:'flex', justifyContent:'space-between', borderTop:'2px solid #000', fontWeight:'bold', fontSize:'18px', marginTop:'5px'}}>
               <span>NET TOTAL:</span><span>Rs. {activePrintBill.totalAmount}</span>
             </div>
           </div>
-          <div style={{clear:'both', marginTop:'100px', textAlign:'center', borderTop:'1px solid #eee', paddingTop:'20px'}}>
-            <p>Printed at: {new Date().toLocaleString()}</p>
-            <p>Thank you for your business!</p>
+          <div style={{clear:'both', marginTop:'100px', textAlign:'center', borderTop:'1px solid #eee', paddingTop:'10px', fontSize:'10px'}}>
+             <p>Certified Invoice. Printing Time: {new Date().toLocaleTimeString()}</p>
           </div>
         </div>
       )}

@@ -1,205 +1,157 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebase'; 
-import { collection, query, onSnapshot, doc, deleteDoc } from "firebase/firestore";
-import { QRCodeCanvas } from 'qrcode.react';
-import AddItem from './additem'; 
+import { db } from '../firebase';
+import { collection, onSnapshot, deleteDoc, doc, query, orderBy } from "firebase/firestore";
 
-const InventoryView = () => {
+const InventoryView = ({ onEdit }) => {
   const [items, setItems] = useState([]);
-  const [filteredItems, setFilteredItems] = useState([]);
-  const [viewType, setViewType] = useState('grid'); 
-  const [editingItem, setEditingItem] = useState(null);
-
-  // Filters State
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterCompany, setFilterCompany] = useState('');
-  const [filterCategory, setFilterCategory] = useState('');
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
-
-  const styles = `
-    .inventory-container { background-color: #000; min-height: 100vh; padding: 20px; color: #fff; font-family: 'Segoe UI', sans-serif; }
-    .filter-section { background: #111; padding: 20px; border-radius: 20px; border: 1px solid #222; margin-bottom: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-    .filter-input { background: #fff; color: #000; border: none; padding: 10px; border-radius: 8px; font-size: 13px; outline: none; }
-    .view-toggle { background: #f59e0b; color: #000; padding: 10px 20px; border-radius: 10px; font-weight: bold; cursor: pointer; border: none; }
-    
-    .grid-view { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
-    .item-card { background: #111; padding: 5px; border-radius: 25px; border: 1px solid #222; text-align: center; }
-    
-    .list-view { width: 100%; border-collapse: collapse; background: #111; border-radius: 15px; overflow: hidden; }
-    .list-view th { background: #f59e0b; color: #000; padding: 12px; text-align: left; }
-    .list-view td { padding: 12px; border-bottom: 1px solid #222; font-size: 14px; }
-    
-    .btn-action { min-width: 120px; padding: 10px 15px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; font-size: 11px; text-transform: uppercase; transition: 0.3s; }
-    .btn-edit { background: #3b82f6; color: #fff; }
-    .btn-qr { background: #fff; color: #000; }
-    .btn-barcode { background: #10b981; color: #fff; }
-    .btn-delete { background: #ef4444; color: #fff; }
-    
-    .button-group-pair { display: flex; gap: 8px; }
-    .pair-separator { margin-right: 25px; } 
-
-    .edit-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 2000; overflow-y: auto; padding-top: 20px; }
-    .close-edit { position: fixed; top: 20px; right: 20px; background: #ef4444; color: #fff; border: none; padding: 12px 24px; border-radius: 10px; font-weight: bold; z-index: 2100; cursor: pointer; }
-  `;
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, "inventory_records"));
+    const q = query(collection(db, "inventory_records"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setItems(data);
+      const itemList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setItems(itemList);
+      setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    let result = items.filter(item => {
-      const nameMatch = item.name?.toLowerCase().includes(searchTerm.toLowerCase());
-      const companyMatch = filterCompany ? item.company === filterCompany : true;
-      const catMatch = filterCategory ? item.category === filterCategory : true;
-      const priceVal = parseFloat(item.retailPrice || 0);
-      const priceMatch = (minPrice ? priceVal >= parseFloat(minPrice) : true) && 
-                         (maxPrice ? priceVal <= parseFloat(maxPrice) : true);
-      return nameMatch && companyMatch && catMatch && priceMatch;
-    });
-    setFilteredItems(result);
-  }, [searchTerm, filterCompany, filterCategory, minPrice, maxPrice, items]);
-
   const handleDelete = async (id) => {
-    if(window.confirm("Are you sure you want to delete this item?")) {
-      await deleteDoc(doc(db, "inventory_records", id));
+    if (window.confirm("Are you sure you want to delete this item?")) {
+      try {
+        await deleteDoc(doc(db, "inventory_records", id));
+      } catch (err) {
+        alert("Error deleting: " + err.message);
+      }
     }
   };
 
-  // FIX: Added White Border to Downloaded QR/Barcode
-  const downloadAsset = (id, itemName, type) => {
-    const canvas = document.getElementById(id);
-    const tempCanvas = document.createElement("canvas");
-    const ctx = tempCanvas.getContext("2d");
-    const padding = 40; 
-    
-    tempCanvas.width = canvas.width + padding;
-    tempCanvas.height = canvas.height + padding;
-    
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-    ctx.drawImage(canvas, padding/2, padding/2);
+  const filteredItems = items.filter(item => 
+    item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.company?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-    const pngUrl = tempCanvas.toDataURL("image/png");
-    let downloadLink = document.createElement("a");
-    downloadLink.href = pngUrl;
-    downloadLink.download = `${itemName}_${type}.png`;
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
-  };
+  const styles = `
+    .inventory-container { background-color: #000; min-height: 100vh; padding: 20px; color: #fff; font-family: 'Segoe UI', sans-serif; }
+    .header-section { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
+    .search-bar { background: #111; border: 1px solid #333; padding: 12px 20px; border-radius: 12px; color: #fff; width: 300px; outline: none; }
+    .search-bar:focus { border-color: #f59e0b; }
+    
+    .table-responsive { background: #111; border-radius: 20px; overflow-x: auto; border: 1px solid #222; }
+    table { width: 100%; border-collapse: collapse; min-width: 1000px; }
+    th { background: #1a1a1a; color: #f59e0b; text-align: left; padding: 15px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+    td { padding: 15px; border-bottom: 1px solid #222; font-size: 14px; vertical-align: middle; }
+    
+    .item-img { width: 45px; height: 45px; border-radius: 8px; object-fit: cover; background: #000; }
+    .stock-badge { padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; }
+    .low-stock { background: #7f1d1d; color: #fecaca; }
+    .normal-stock { background: #064e3b; color: #d1fae5; }
+    
+    .action-btn { padding: 8px 12px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; margin-right: 5px; font-size: 12px; }
+    .edit-btn { background: #f59e0b; color: #000; }
+    .delete-btn { background: #ef4444; color: #fff; }
+    
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+    .stat-card { background: #111; padding: 20px; border-radius: 20px; border: 1px solid #222; text-align: center; }
+    .stat-val { display: block; font-size: 24px; font-weight: 900; color: #f59e0b; }
+    .stat-lbl { font-size: 12px; color: #9ca3af; text-transform: uppercase; }
+  `;
 
   return (
     <div className="inventory-container">
       <style>{styles}</style>
       
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
-        <h2 style={{ color: '#f59e0b', fontStyle: 'italic', fontWeight: '900', fontSize: '24px' }}>FLOWTRACK EXPLORER</h2>
-        <button className="view-toggle" onClick={() => setViewType(viewType === 'grid' ? 'list' : 'grid')}>
-          {viewType === 'grid' ? 'SWITCH TO LIST' : 'SWITCH TO GRID'}
-        </button>
+      <div className="header-section">
+        <h2 style={{ fontStyle: 'italic', fontWeight: '900', color: '#f59e0b', margin: 0 }}>INVENTORY DASHBOARD</h2>
+        <input 
+          type="text" 
+          className="search-bar" 
+          placeholder="Search by Name, SKU or Company..." 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
-      <div className="filter-section">
-        <input className="filter-input" placeholder="Search Item..." onChange={e => setSearchTerm(e.target.value)} />
-        <input className="filter-input" placeholder="Company..." onChange={e => setFilterCompany(e.target.value.toUpperCase())} />
-        <input className="filter-input" placeholder="Category..." onChange={e => setFilterCategory(e.target.value.toUpperCase())} />
-        <input className="filter-input" placeholder="Min Price" type="number" onChange={e => setMinPrice(e.target.value)} />
-        <input className="filter-input" placeholder="Max Price" type="number" onChange={e => setMaxPrice(e.target.value)} />
-      </div>
-
-      {viewType === 'grid' ? (
-        <div className="grid-view">
-          {filteredItems.map(item => (
-            <div key={item.id} className="item-card">
-              <div style={{ height: '180px', background: '#000', borderRadius: '15px', marginBottom: '10px', overflow: 'hidden', border: '1px solid #222' }}>
-                {item.imageUrl ? <img src={item.imageUrl} style={{width:'100%', height:'100%', objectFit:'cover'}} alt="p" /> : <div style={{paddingTop:'70px', color:'#333'}}>NO IMAGE</div>}
-              </div>
-              <h4 style={{margin:'5px 0', fontSize: '18px'}}>{item.name}</h4>
-              <p style={{color:'#f59e0b', fontWeight: 'bold'}}>{item.retailPrice} PKR</p>
-              
-              <div style={{marginTop:'15px', display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center'}}>
-                <div className="button-group-pair">
-                  <button className="btn-action btn-qr" onClick={() => downloadAsset(`qr-${item.id}`, item.name, 'QR')}>QR</button>
-                  <button className="btn-action btn-barcode" onClick={() => downloadAsset(`bar-${item.id}`, item.name, 'BARCODE')}>BARCODE</button>
-                </div>
-                <div className="button-group-pair">
-                  <button className="btn-action btn-edit" onClick={() => setEditingItem(item)}>EDIT</button>
-                  <button className="btn-action btn-delete" onClick={() => handleDelete(item.id)}>DELETE</button>
-                </div>
-                
-                <div style={{display:'none'}}>
-                  <QRCodeCanvas id={`qr-${item.id}`} value={item.qrCodeData} size={256} />
-                  <QRCodeCanvas id={`bar-${item.id}`} value={item.barcodeData} size={256} />
-                </div>
-              </div>
-            </div>
-          ))}
+      <div className="stats-grid">
+        <div className="stat-card">
+          <span className="stat-val">{items.length}</span>
+          <span className="stat-lbl">Total Items</span>
         </div>
-      ) : (
-        <div style={{overflowX:'auto'}}>
-          <table className="list-view">
+        <div className="stat-card">
+          <span className="stat-val">{items.reduce((acc, curr) => acc + (parseFloat(curr.totalPcs) || 0), 0)}</span>
+          <span className="stat-lbl">Total Stock (Pcs)</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-val">{items.reduce((acc, curr) => acc + (parseFloat(curr.totalWeight) || 0), 0).toFixed(2)}</span>
+          <span className="stat-lbl">Total Weight (KG)</span>
+        </div>
+      </div>
+
+      <div className="table-responsive">
+        {loading ? (
+          <div style={{ padding: '40px', textAlign: 'center' }}>Loading Inventory...</div>
+        ) : (
+          <table>
             <thead>
               <tr>
-                <th>Item Name</th>
-                <th>Company</th>
-                <th>Price</th>
-                <th>Actions Control</th>
+                <th>Image</th>
+                <th>Item Details</th>
+                <th>Company/Cat</th>
+                <th>Stock Stats</th>
+                <th>Prices</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredItems.map(item => (
-                <tr key={item.id}>
-                  <td style={{fontWeight:'bold'}}>{item.name}</td>
-                  <td>{item.company}</td>
-                  <td style={{color:'#f59e0b', fontWeight:'bold'}}>{item.retailPrice}</td>
-                  <td>
-                    <div style={{display:'flex', alignItems:'center'}}>
-                      <div className="button-group-pair pair-separator">
-                        <button className="btn-action btn-qr" onClick={() => downloadAsset(`qr-${item.id}`, item.name, 'QR')}>QR</button>
-                        <button className="btn-action btn-barcode" onClick={() => downloadAsset(`bar-${item.id}`, item.name, 'BARCODE')}>BARCODE</button>
+              {filteredItems.map((item) => {
+                const isLow = (parseFloat(item.totalPcs) || 0) <= (parseFloat(item.minStock) || 0);
+                return (
+                  <tr key={item.id}>
+                    <td>
+                      {item.imageUrl ? (
+                        <img src={item.imageUrl} className="item-img" alt="Product" />
+                      ) : (
+                        <div className="item-img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', background: '#222' }}>NO IMG</div>
+                      )}
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 'bold', color: '#f59e0b' }}>{item.name}</div>
+                      <div style={{ fontSize: '11px', color: '#666' }}>{item.sku}</div>
+                    </td>
+                    <td>
+                      <div style={{ fontSize: '13px' }}>{item.company}</div>
+                      <div style={{ fontSize: '11px', color: '#f59e0b' }}>{item.category} / {item.subCategory}</div>
+                    </td>
+                    <td>
+                      <div className={`stock-badge ${isLow ? 'low-stock' : 'normal-stock'}`}>
+                        {item.totalPcs} PCS
                       </div>
-                      
-                      <div className="button-group-pair">
-                        <button className="btn-action btn-edit" onClick={() => setEditingItem(item)}>EDIT</button>
-                        <button className="btn-action btn-delete" onClick={() => handleDelete(item.id)}>DELETE</button>
+                      <div style={{ fontSize: '11px', marginTop: '5px', color: '#9ca3af' }}>
+                        WT: {item.totalWeight} KG | WH: {item.warehouse}
                       </div>
-                    </div>
-
-                    <div style={{display:'none'}}>
-                      <QRCodeCanvas id={`qr-${item.id}`} value={item.qrCodeData} size={256} />
-                      <QRCodeCanvas id={`bar-${item.id}`} value={item.barcodeData} size={256} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td>
+                      <div style={{ fontSize: '12px' }}>TP: {item.tradePrice}</div>
+                      <div style={{ fontSize: '12px', color: '#10b981' }}>RP: {item.retailPrice}</div>
+                    </td>
+                    <td>
+                      <button className="action-btn edit-btn" onClick={() => onEdit(item)}>Edit</button>
+                      <button className="action-btn delete-btn" onClick={() => handleDelete(item.id)}>Del</button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
-        </div>
-      )}
-
-      {editingItem && (
-        <div className="edit-overlay">
-          <button className="close-edit" onClick={() => setEditingItem(null)}>✖ CANCEL EDIT</button>
-          <AddItem 
-            editData={editingItem} 
-            onComplete={() => {
-              setEditingItem(null);
-            }} 
-          />
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
 
 export default InventoryView;
-
-
-
-

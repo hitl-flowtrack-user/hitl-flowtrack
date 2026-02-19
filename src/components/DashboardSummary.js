@@ -8,106 +8,153 @@ const DashboardSummary = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Inventory and Sales dono ka data real-time fetch ho raha hai
     const unsubInventory = onSnapshot(collection(db, "inventory_records"), (snapshot) => {
       setItems(snapshot.docs.map(doc => doc.data()));
     });
-
     const unsubSales = onSnapshot(query(collection(db, "sales_records"), orderBy("createdAt", "desc")), (snapshot) => {
       setSales(snapshot.docs.map(doc => doc.data()));
       setLoading(false);
     });
-
     return () => { unsubInventory(); unsubSales(); };
   }, []);
 
-  // 1. Inventory Stats
-  const totalPurchaseVal = items.reduce((a, c) => a + ((parseFloat(c.purchasePrice) || 0) * (parseFloat(c.totalPcs) || 0)), 0);
-  const totalWeight = items.reduce((a, c) => a + (parseFloat(c.totalWeight) || 0), 0);
-  
-  // 2. Sales & Profit Stats (All Time)
+  // Stats Logic
   const totalRevenue = sales.reduce((a, s) => a + (parseFloat(s.totalAmount) || 0), 0);
-  
-  // Profit calculation logic: Sale Price - Original Purchase Price
-  let totalProfit = 0;
-  sales.forEach(sale => {
-    sale.items.forEach(soldItem => {
-      const purchasePrice = parseFloat(soldItem.purchasePrice) || 0;
-      const salePrice = parseFloat(soldItem.salePrice) || 0;
-      const qty = parseFloat(soldItem.quantity) || 0;
-      totalProfit += (salePrice - purchasePrice) * qty;
-    });
-  });
-
-  // 3. Low Stock & Top Selling Logic
-  const lowStockItems = items.filter(item => (parseFloat(item.openingStock) || 0) < 10);
+  const totalStockVal = items.reduce((a, c) => a + ((parseFloat(c.purchasePrice) || 0) * (parseFloat(c.totalPcs) || 0)), 0);
+  const totalSalesCount = sales.length;
 
   const styles = `
-    .dash-container { padding: 25px; background: #000; min-height: 100vh; color: #fff; font-family: 'Segoe UI', sans-serif; }
-    .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
-    .stat-card { background: #111; padding: 20px; border-radius: 15px; border-bottom: 4px solid #333; transition: 0.3s; }
-    .stat-card:hover { transform: translateY(-5px); border-color: #f59e0b; }
-    .label { color: #888; font-size: 11px; text-transform: uppercase; font-weight: bold; }
-    .value { display: block; font-size: 24px; font-weight: 900; margin-top: 10px; color: #f59e0b; }
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&display=swap');
     
-    .grid-2 { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; }
-    .panel { background: #111; padding: 20px; border-radius: 20px; border: 1px solid #222; }
-    .panel-header { font-size: 16px; font-weight: 900; color: #f59e0b; margin-bottom: 20px; border-bottom: 1px solid #222; padding-bottom: 10px; }
-    
-    .list-item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #222; font-size: 14px; }
-    .profit-text { color: #10b981; font-weight: bold; }
+    .dash-wrapper { 
+      padding: 30px; background: #000; min-height: 100vh; 
+      font-family: 'Outfit', sans-serif; color: #fff;
+    }
+
+    .header-section { margin-bottom: 40px; }
+    .gold-text { 
+      color: #D4AF37; font-weight: 900; letter-spacing: 2px; 
+      text-shadow: 0 0 15px rgba(212, 175, 55, 0.4); 
+    }
+
+    /* Glowing Stats Grid */
+    .stats-grid { 
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
+      gap: 25px; margin-bottom: 40px; 
+    }
+
+    .glow-card {
+      background: linear-gradient(145deg, #0f0f0f, #050505);
+      border: 1px solid rgba(212, 175, 55, 0.2);
+      padding: 30px; border-radius: 25px; position: relative;
+      overflow: hidden; transition: 0.4s ease;
+    }
+    .glow-card:hover {
+      transform: translateY(-10px);
+      border-color: #D4AF37;
+      box-shadow: 0 15px 35px rgba(212, 175, 55, 0.15);
+    }
+    .glow-card::after {
+      content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+      background: radial-gradient(circle, rgba(212, 175, 55, 0.05) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .stat-label { color: #888; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+    .stat-value { 
+      display: block; font-size: 32px; font-weight: 900; margin-top: 10px; 
+      background: linear-gradient(to right, #D4AF37, #F9E2AF);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+
+    /* Info Panels */
+    .info-row { display: grid; grid-template-columns: 1.5fr 1fr; gap: 25px; }
+    .glass-panel {
+      background: rgba(15, 15, 15, 0.8); border: 1px solid #222;
+      padding: 25px; border-radius: 30px; backdrop-filter: blur(10px);
+    }
+    .panel-title { 
+      font-size: 18px; font-weight: 600; color: #D4AF37; 
+      margin-bottom: 20px; display: flex; align-items: center; gap: 10px;
+    }
+
+    .transaction-item {
+      display: flex; justify-content: space-between; padding: 15px 0;
+      border-bottom: 1px solid #1a1a1a; transition: 0.3s;
+    }
+    .transaction-item:hover { padding-left: 10px; color: #D4AF37; }
+
+    .tag-gold {
+      background: rgba(212, 175, 55, 0.1); color: #D4AF37;
+      padding: 4px 12px; border-radius: 50px; font-size: 11px; font-weight: bold; border: 1px solid #D4AF37;
+    }
+
+    .progress-track {
+      width: 100%; height: 6px; background: #1a1a1a; border-radius: 10px; margin-top: 8px;
+    }
+    .progress-fill {
+      height: 100%; background: #D4AF37; border-radius: 10px;
+      box-shadow: 0 0 10px #D4AF37;
+    }
   `;
 
-  if (loading) return <div style={{textAlign:'center', color:'#f59e0b', padding:'50px'}}>Gathering Business Intel...</div>;
+  if (loading) return <div style={{background:'#000', color:'#D4AF37', height:'100vh', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'20px', fontWeight:'900'}}>INITIALIZING LUXURY SUITE...</div>;
 
   return (
-    <div className="dash-container">
+    <div className="dash-wrapper">
       <style>{styles}</style>
       
-      <div style={{marginBottom:'30px'}}>
-        <h2 style={{margin:0, fontStyle:'italic', fontWeight:'900', color:'#f59e0b'}}>BUSINESS INTELLIGENCE</h2>
-        <p style={{margin:0, color:'#555', fontSize:'12px'}}>Real-time performance analytics</p>
+      <div className="header-section">
+        <h1 className="gold-text" style={{margin:0}}>SYSTEM OVERVIEW</h1>
+        <p style={{color:'#555', fontSize:'14px'}}>Welcome back, Admin. Here is your business at a glance.</p>
       </div>
 
-      <div className="stat-row">
-        <div className="stat-card">
-          <span className="label">Total Sales Revenue</span>
-          <span className="value">Rs. {totalRevenue.toLocaleString()}</span>
+      <div className="stats-grid">
+        <div className="glow-card">
+          <span className="stat-label">Total Revenue</span>
+          <span className="stat-value">Rs. {totalRevenue.toLocaleString()}</span>
+          <div className="progress-track"><div className="progress-fill" style={{width: '75%'}}></div></div>
         </div>
-        <div className="stat-card">
-          <span className="label">Estimated Net Profit</span>
-          <span className="value" style={{color:'#10b981'}}>Rs. {totalProfit.toLocaleString()}</span>
+        <div className="glow-card">
+          <span className="stat-label">Stock Inventory Value</span>
+          <span className="stat-value">Rs. {totalStockVal.toLocaleString()}</span>
+          <div className="progress-track"><div className="progress-fill" style={{width: '60%'}}></div></div>
         </div>
-        <div className="stat-card">
-          <span className="label">Inventory Value (Stock)</span>
-          <span className="value">Rs. {totalPurchaseVal.toLocaleString()}</span>
-        </div>
-        <div className="stat-card">
-          <span className="label">Dead Weight in WH</span>
-          <span className="value">{totalWeight.toFixed(1)} KG</span>
+        <div className="glow-card">
+          <span className="stat-label">Active Sales</span>
+          <span className="stat-value">{totalSalesCount} <small style={{fontSize:'12px', color:'#555', WebkitTextFillColor:'#555'}}>Invoices</small></span>
+          <div className="progress-track"><div className="progress-fill" style={{width: '45%'}}></div></div>
         </div>
       </div>
 
-      <div className="grid-2">
-        <div className="panel">
-          <div className="panel-header">RECENT TRANSACTIONS</div>
-          {sales.slice(0, 6).map((sale, i) => (
-            <div className="list-item" key={i}>
-              <span>{sale.customerName} <br/><small style={{color:'#444'}}>{sale.createdAt?.toDate().toLocaleDateString()}</small></span>
-              <span className="profit-text">+ Rs. {sale.totalAmount.toLocaleString()}</span>
+      <div className="info-row">
+        <div className="glass-panel">
+          <div className="panel-title"><span>📜</span> Recent Transactions</div>
+          {sales.slice(0, 5).map((s, i) => (
+            <div className="transaction-item" key={i}>
+              <div>
+                <div style={{fontWeight:600}}>{s.customerName}</div>
+                <small style={{color:'#444'}}>{s.createdAt?.toDate().toLocaleDateString()}</small>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontWeight:900, color:'#D4AF37'}}>+ Rs. {s.totalAmount?.toLocaleString()}</div>
+                <span className="tag-gold">SUCCESS</span>
+              </div>
             </div>
           ))}
-          {sales.length === 0 && <p style={{color:'#444'}}>No sales recorded yet.</p>}
         </div>
 
-        <div className="panel">
-          <div className="panel-header">STOCK REPLENISHMENT</div>
-          {lowStockItems.length > 0 ? lowStockItems.map((item, i) => (
-            <div className="list-item" key={i} style={{borderLeft:'3px solid #ef4444', marginBottom:'5px', background:'#1a1111'}}>
-              <span>{item.name}</span>
-              <span style={{color:'#ef4444', fontWeight:'bold'}}>{item.openingStock} Boxes</span>
+        <div className="glass-panel">
+          <div className="panel-title"><span>⚠️</span> Low Stock Alerts</div>
+          {items.filter(item => (parseFloat(item.openingStock) || 0) < 10).slice(0, 5).map((item, i) => (
+            <div className="transaction-item" key={i}>
+              <div style={{color: '#888'}}>{item.name}</div>
+              <div style={{color: '#ef4444', fontWeight:'bold'}}>{item.openingStock} Boxes</div>
             </div>
-          )) : <div style={{textAlign:'center', padding:'20px', color:'#10b981'}}>✓ All stock levels optimal</div>}
+          ))}
+          {items.filter(item => (parseFloat(item.openingStock) || 0) < 10).length === 0 && 
+            <div style={{textAlign:'center', color:'#555', marginTop:'40px'}}>Inventory Health: Excellent</div>
+          }
         </div>
       </div>
     </div>

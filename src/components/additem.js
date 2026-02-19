@@ -145,7 +145,7 @@ const AddItem = ({ editData, onComplete }) => {
   return (
     <div className="add-item-container">
       <style>{styles}</style>
-          <h2 style={{ fontStyle: 'italic', fontWeight: '900', color: '#f59e0b', marginBottom: '30px' }}>PRODUCT REGISTRATION</h2>
+        <h2 style={{ fontStyle: 'italic', fontWeight: '900', color: '#f59e0b', textAlign:'center', marginBottom: '30px' }}>PRODUCT REGISTRATION</h2>
       <div className="layout-grid">
         {/* LEFT CARD - FORM */}
         <div className="form-card">
@@ -196,8 +196,6 @@ const AddItem = ({ editData, onComplete }) => {
                 <div className="flex-1"><label className="label-text">Min Stock *</label><input type="number" className="custom-input" value={formData.minStock} onChange={e=>setFormData({...formData, minStock: e.target.value})} required /></div>
                 <div className="flex-1"><label className="label-text">Max Stock *</label><input type="number" className="custom-input" value={formData.maxStock} onChange={e=>setFormData({...formData, maxStock: e.target.value})} required /></div>
               </div>
-              
-              <button type="submit" className="btn-main">{statusMessage || (editData ? "UPDATE ITEM" : "SAVE ITEM")}</button>
             </form>
           </div>
         </div>
@@ -229,6 +227,7 @@ const AddItem = ({ editData, onComplete }) => {
             <label className="label-text" style={{color: '#f59e0b'}}>QR Data</label>
             <div style={{fontSize:'10px', color:'#888', wordBreak: 'break-all'}}>{formData.qrCodeData}</div>
           </div>
+              <button type="submit" className="btn-main">{statusMessage || (editData ? "UPDATE ITEM" : "SAVE ITEM")}</button>
         </div>
       </div>
       <input type="file" ref={fileInputRef} hidden onChange={e => {
@@ -241,4 +240,5 @@ const AddItem = ({ editData, onComplete }) => {
 };
 
 export default AddItem;
+
 

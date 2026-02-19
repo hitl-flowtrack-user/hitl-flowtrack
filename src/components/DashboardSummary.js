@@ -22,127 +22,156 @@ const DashboardSummary = () => {
   const totalStockVal = items.reduce((a, c) => a + ((parseFloat(c.purchasePrice) || 0) * (parseFloat(c.totalPcs) || 0)), 0);
 
   const styles = `
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&display=swap');
     
-    .dashboard-container {
-      padding: 40px; background: #000; min-height: 100vh;
-      font-family: 'Outfit', sans-serif; color: #fff;
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 25px;
+    .dash-outer {
+      background: #000;
+      min-height: 100vh;
+      font-family: 'Outfit', sans-serif;
+      color: #fff;
+      padding: 20px;
     }
 
-    .header-area {
-      grid-column: span 4; display: flex; justify-content: space-between; align-items: flex-end;
-      margin-bottom: 20px; border-bottom: 1px solid #111; padding-bottom: 20px;
+    /* Grid Layout */
+    .dash-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 15px;
+      max-width: 1400px;
+      margin: 0 auto;
     }
 
-    .premium-card {
-      background: linear-gradient(145deg, #0a0a0a, #111);
-      border: 1px solid rgba(212, 175, 55, 0.1);
-      border-radius: 35px; padding: 30px; position: relative;
-      transition: 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
-    }
-    .premium-card:hover {
-      border-color: #D4AF37; transform: scale(1.02);
-      box-shadow: 0 20px 60px rgba(212, 175, 55, 0.08);
+    /* Header Styling */
+    .dash-header {
+      grid-column: span 4;
+      padding: 10px 0 20px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
-    .main-stat { grid-column: span 2; grid-row: span 1; }
-    
-    .gold-accent { color: #D4AF37; font-weight: 800; }
-    .stat-title { color: #555; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; font-weight: 600; }
-    .stat-value { font-size: 48px; font-weight: 800; margin: 15px 0; display: block; }
-    
-    .chart-stub {
-      height: 60px; width: 100%; background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.1), transparent);
-      border-radius: 15px; margin-top: 20px; position: relative; overflow: hidden;
-    }
-    .chart-stub::after {
-      content: ''; position: absolute; left: 0; top: 50%; width: 100%; height: 2px;
-      background: #D4AF37; box-shadow: 0 0 15px #D4AF37;
+    .title-glow {
+      font-size: clamp(24px, 5vw, 36px);
+      font-weight: 900;
+      margin: 0;
+      background: linear-gradient(to right, #D4AF37, #F9E2AF);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 20px rgba(212, 175, 55, 0.3);
     }
 
-    .list-panel { grid-column: span 2; background: #080808; border-radius: 35px; padding: 30px; border: 1px solid #111; }
-    
-    .data-row {
+    /* Card Styling */
+    .bento-card {
+      background: linear-gradient(145deg, #0d0d0d, #050505);
+      border: 1px solid rgba(212, 175, 55, 0.15);
+      border-radius: 24px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      transition: 0.3s ease;
+    }
+
+    .bento-card:hover {
+      border-color: #D4AF37;
+      box-shadow: 0 0 25px rgba(212, 175, 55, 0.1);
+    }
+
+    /* Stat Styles */
+    .stat-hero { grid-column: span 2; grid-row: span 1; border-left: 4px solid #D4AF37; }
+    .label { color: #555; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; font-weight: 600; }
+    .val { font-size: clamp(24px, 4vw, 32px); font-weight: 900; color: #D4AF37; margin: 10px 0; display: block; }
+
+    /* Lists */
+    .list-panel { grid-column: span 2; background: #080808; }
+    .row-item {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 18px; background: #0c0c0c; border-radius: 20px; margin-bottom: 12px;
-      border: 1px solid transparent; transition: 0.3s;
+      padding: 12px; background: rgba(255,255,255,0.03);
+      border-radius: 15px; margin-bottom: 8px; border: 1px solid rgba(212,175,55,0.05);
     }
-    .data-row:hover { border-color: rgba(212, 175, 55, 0.2); background: #111; }
 
-    .indicator { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 10px; }
+    /* Mobile Responsive Logic */
+    @media (max-width: 900px) {
+      .dash-grid { grid-template-columns: repeat(2, 1fr); }
+      .dash-header { grid-column: span 2; flex-direction: column; align-items: flex-start; gap: 10px; }
+      .stat-hero { grid-column: span 2; }
+      .list-panel { grid-column: span 2; }
+    }
+
+    @media (max-width: 600px) {
+      .dash-outer { padding: 15px; padding-top: 40px; } /* Space for mobile menu */
+      .dash-grid { grid-template-columns: 1fr; gap: 12px; }
+      .dash-header { grid-column: span 1; }
+      .stat-hero { grid-column: span 1; }
+      .bento-card { grid-column: span 1; }
+      .list-panel { grid-column: span 1; }
+      .title-glow { font-size: 28px; }
+    }
+
+    /* Glow Effect */
+    .glow-dot { width: 8px; height: 8px; background: #3fb950; border-radius: 50%; display: inline-block; box-shadow: 0 0 10px #3fb950; margin-right: 8px; }
   `;
 
-  if (loading) return <div style={{background:'#000', height:'100vh', display:'flex', justifyContent:'center', alignItems:'center', color:'#D4AF37', fontFamily:'Outfit'}}>INITIALIZING...</div>;
+  if (loading) return <div style={{background:'#000', color:'#D4AF37', height:'100vh', display:'flex', justifyContent:'center', alignItems:'center', fontWeight:'900'}}>SYNCING SYSTEM...</div>;
 
   return (
-    <div className="dashboard-container">
+    <div className="dash-outer">
       <style>{styles}</style>
       
-      {/* 1. Dynamic Header */}
-      <div className="header-area">
-        <div>
-          <span className="gold-accent" style={{letterSpacing: '5px'}}>PREMIUM ACCESS</span>
-          <h1 style={{margin:'5px 0 0 0', fontSize:'40px', fontWeight: 800}}>COMMAND <span className="gold-accent">CENTER</span></h1>
-        </div>
-        <div style={{textAlign:'right'}}>
-          <div style={{fontSize:'12px', color:'#444'}}>SYSTEM STATUS</div>
-          <div style={{color:'#3fb950', fontWeight:'bold'}}><span className="indicator" style={{background:'#3fb950'}}></span>ONLINE</div>
-        </div>
-      </div>
-
-      {/* 2. Top Large Metrics */}
-      <div className="premium-card main-stat">
-        <span className="stat-title">Gross Revenue (Total)</span>
-        <span className="stat-value">Rs. {totalRevenue.toLocaleString()}<span style={{fontSize:'18px', color:'#3fb950', marginLeft:'15px'}}>+12%</span></span>
-        <div className="chart-stub"></div>
-      </div>
-
-      <div className="premium-card">
-        <span className="stat-title">Inventory Net Worth</span>
-        <span className="stat-value" style={{fontSize:'32px'}}>Rs. {totalStockVal.toLocaleString()}</span>
-        <p style={{color:'#444', fontSize:'12px', margin:0}}>Based on purchase prices</p>
-      </div>
-
-      <div className="premium-card">
-        <span className="stat-title">Total Transactions</span>
-        <span className="stat-value" style={{fontSize:'32px'}}>{sales.length}</span>
-        <div style={{display:'flex', gap:'5px'}}>
-            <div style={{width:'20%', height:'4px', background:'#D4AF37', borderRadius:'10px'}}></div>
-            <div style={{width:'80%', height:'4px', background:'#222', borderRadius:'10px'}}></div>
-        </div>
-      </div>
-
-      {/* 3. Bottom Panels */}
-      <div className="list-panel">
-        <h3 style={{marginTop:0, marginBottom:'25px', fontSize:'18px'}} className="gold-accent">LIVE FEED</h3>
-        {sales.slice(0, 4).map((sale, i) => (
-          <div className="data-row" key={i}>
-            <div>
-              <div style={{fontWeight: 600}}>{sale.customerName}</div>
-              <div style={{fontSize:'11px', color:'#444'}}>{new Date().toLocaleTimeString()}</div>
-            </div>
-            <div style={{textAlign:'right'}}>
-              <div className="gold-accent" style={{fontSize:'16px'}}>Rs. {sale.totalAmount}</div>
-              <div style={{fontSize:'10px', color:'#3fb950'}}>CONFIRMED</div>
-            </div>
+      <div className="dash-grid">
+        {/* Header */}
+        <div className="dash-header">
+          <div>
+            <h1 className="title-glow">COMMAND CENTER</h1>
+            <p style={{margin:0, color:'#444', fontSize:'13px'}}>Live System Intelligence</p>
           </div>
-        ))}
-      </div>
-
-      <div className="list-panel">
-        <h3 style={{marginTop:0, marginBottom:'25px', fontSize:'18px'}} className="gold-accent">INVENTORY ALERT</h3>
-        {items.filter(item => (parseFloat(item.openingStock) || 0) < 10).slice(0, 4).map((item, i) => (
-          <div className="data-row" key={i} style={{borderLeft: '4px solid #ef4444'}}>
-            <div>
-              <div style={{fontWeight: 600}}>{item.name}</div>
-              <div style={{fontSize:'11px', color:'#444'}}>Stock Ref: {item.sku || 'N/A'}</div>
-            </div>
-            <div style={{color:'#ef4444', fontWeight:'bold'}}>{item.openingStock} Left</div>
+          <div style={{background:'#111', padding:'8px 15px', borderRadius:'12px', border:'1px solid #222', fontSize:'12px'}}>
+            <span className="glow-dot"></span> LIVE STATUS
           </div>
-        ))}
-      </div>
+        </div>
 
+        {/* Stats Section */}
+        <div className="bento-card stat-hero">
+          <span className="label">Total Revenue</span>
+          <span className="val">Rs. {totalRevenue.toLocaleString()}</span>
+          <div style={{width:'100%', height:'4px', background:'#1a1a1a', borderRadius:'10px'}}>
+             <div style={{width:'70%', height:'100%', background:'#D4AF37', borderRadius:'10px', boxShadow:'0 0 10px #D4AF37'}}></div>
+          </div>
+        </div>
+
+        <div className="bento-card">
+          <span className="label">Stock Value</span>
+          <span className="val" style={{fontSize:'22px'}}>Rs. {totalStockVal.toLocaleString()}</span>
+        </div>
+
+        <div className="bento-card">
+          <span className="label">Invoices</span>
+          <span className="val" style={{fontSize:'22px'}}>{sales.length}</span>
+        </div>
+
+        {/* Lists Section */}
+        <div className="bento-card list-panel">
+          <h3 style={{fontSize:'16px', color:'#D4AF37', marginTop:0}}>RECENT SALES</h3>
+          {sales.slice(0, 4).map((s, i) => (
+            <div className="row-item" key={i}>
+              <div style={{fontSize:'13px'}}>
+                <div style={{fontWeight:600}}>{s.customerName}</div>
+                <div style={{fontSize:'10px', color:'#555'}}>{new Date().toLocaleTimeString()}</div>
+              </div>
+              <div style={{fontWeight:900, color:'#D4AF37', fontSize:'14px'}}>Rs. {s.totalAmount}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="bento-card list-panel">
+          <h3 style={{fontSize:'16px', color:'#ef4444', marginTop:0}}>LOW STOCK</h3>
+          {items.filter(item => (parseFloat(item.openingStock) || 0) < 10).slice(0, 4).map((item, i) => (
+            <div className="row-item" key={i} style={{borderLeft:'3px solid #ef4444'}}>
+              <div style={{fontSize:'13px', fontWeight:600}}>{item.name}</div>
+              <div style={{color:'#ef4444', fontWeight:'bold', fontSize:'13px'}}>{item.openingStock} Box</div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 };

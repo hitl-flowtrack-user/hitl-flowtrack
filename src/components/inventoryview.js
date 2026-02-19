@@ -38,21 +38,20 @@ const InventoryView = ({ onEdit }) => {
     const img = new Image();
     
     img.onload = () => {
-      // 2-Inch Size Control (High Quality)
-      // Standard 300 DPI for 2 inches is 600px
-      const targetWidth = type === 'bc' ? 600 : 400; 
-      const aspectRatio = img.height / img.width;
-      
+      // 3 Times smaller width logic for barcode (approx 350-400px for 2 inches)
+      const targetWidth = type === 'bc' ? 400 : 400; 
+      const scale = targetWidth / img.width;
       canvas.width = targetWidth;
-      canvas.height = targetWidth * aspectRatio;
+      canvas.height = img.height * scale;
 
-      // Fill White Background & Border
+      // Ensure High Quality Pixels
+      ctx.imageSmoothingEnabled = false; 
       ctx.fillStyle = "white";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       
-      // QR Border logic (Padding)
-      const padding = type === 'qr' ? 40 : 10;
-      ctx.drawImage(img, padding, padding, canvas.width - (padding * 2), canvas.height - (padding * 2));
+      // Add padding for QR or Barcode to act as white border
+      const p = 15; 
+      ctx.drawImage(img, p, p, canvas.width - (p * 2), canvas.height - (p * 2));
       
       const pngFile = canvas.toDataURL("image/png", 1.0);
       const downloadLink = document.createElement("a");
@@ -60,7 +59,7 @@ const InventoryView = ({ onEdit }) => {
       downloadLink.href = pngFile;
       downloadLink.click();
     };
-    img.src = "data:image/svg+xml;base64," + btoa(svgData);
+    img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
   };
 
   const filteredItems = items.filter(item => 
@@ -71,26 +70,27 @@ const InventoryView = ({ onEdit }) => {
   const styles = `
     .inventory-container { background-color: #000; min-height: 100vh; padding: 20px; color: #fff; font-family: 'Segoe UI', sans-serif; }
     .header-section { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-    .search-bar { background: #111; border: 1px solid #333; padding: 12px 20px; border-radius: 12px; color: #fff; width: 300px; }
-    .table-responsive { background: #111; border-radius: 20px; overflow-x: auto; border: 1px solid #222; }
-    table { width: 100%; border-collapse: collapse; min-width: 1200px; }
+    .search-bar { background: #111; border: 1px solid #333; padding: 12px 20px; border-radius: 12px; color: #fff; width: 300px; outline: none; }
+    .table-responsive { background: #111; border-radius: 20px; overflow-x: auto; border: 1px solid #222; position: relative; }
+    table { width: 100%; border-collapse: collapse; min-width: 1100px; }
     th { background: #1a1a1a; color: #f59e0b; text-align: left; padding: 15px; font-size: 11px; text-transform: uppercase; }
-    td { padding: 15px; border-bottom: 1px solid #222; font-size: 14px; }
-    .item-img { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; }
+    td { padding: 15px; border-bottom: 1px solid #222; font-size: 14px; color: #eee; }
+    .item-img { width: 55px; height: 55px; border-radius: 8px; object-fit: cover; border: 1px solid #333; }
     
     .label-clickable { 
-      background: #fff; padding: 5px; border-radius: 4px; display: flex; 
+      background: #fff; padding: 4px; border-radius: 4px; display: flex; 
       align-items: center; justify-content: center; cursor: pointer; 
-      border: 3px solid #fff; 
+      border: 2px solid #fff; transition: 0.2s;
     }
+    .label-clickable:hover { transform: scale(1.05); border-color: #f59e0b; }
 
     .action-btn { 
-      padding: 15px 25px; border-radius: 12px; border: none; cursor: pointer; 
-      font-weight: 900; font-size: 16px; text-transform: uppercase;
-      position: relative; z-index: 10; /* Ensures button is clickable */
+      padding: 15px 20px; border-radius: 12px; border: none; cursor: pointer !important; 
+      font-weight: 900; font-size: 15px; text-transform: uppercase;
+      display: inline-flex; align-items: center; justify-content: center;
     }
-    .edit-btn { background: #f59e0b; color: #000; margin-right: 15px; width: 120px; }
-    .delete-btn { background: #ef4444; color: #fff; width: 120px; }
+    .edit-btn { background: #f59e0b; color: #000; margin-right: 12px; width: 110px; }
+    .delete-btn { background: #ef4444; color: #fff; width: 110px; }
     
     .stat-card { background: #111; padding: 15px; border-radius: 15px; border: 1px solid #222; text-align: center; }
     .stat-val { display: block; font-size: 18px; font-weight: 900; color: #f59e0b; }
@@ -101,14 +101,14 @@ const InventoryView = ({ onEdit }) => {
       <style>{styles}</style>
       <div className="header-section">
         <h2 style={{ fontStyle: 'italic', fontWeight: '900', color: '#f59e0b' }}>INVENTORY VIEW</h2>
-        <input type="text" className="search-bar" placeholder="Search..." onChange={(e) => setSearchTerm(e.target.value)} />
+        <input type="text" className="search-bar" placeholder="Search products..." onChange={(e) => setSearchTerm(e.target.value)} />
       </div>
 
-      <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'15px', marginBottom:'20px'}}>
+      <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:'15px', marginBottom:'20px'}}>
         <div className="stat-card"><span className="stat-val">{items.length}</span><small>ITEMS</small></div>
         <div className="stat-card"><span className="stat-val">{items.reduce((a,c)=>a+(parseFloat(c.totalPcs)||0),0)}</span><small>TOTAL PCS</small></div>
-        <div className="stat-card"><span className="stat-val">{items.reduce((a,c)=>a+(parseFloat(c.totalWeight)||0),0).toFixed(2)} KG</span><small>WEIGHT</small></div>
-        <div className="stat-card"><span className="stat-val">{items.reduce((acc, curr) => acc + (parseFloat(curr.tradePrice) * parseFloat(curr.totalPcs) || 0), 0).toLocaleString()}</span><small>VALUE (TP)</small></div>
+        <div className="stat-card"><span className="stat-val">{items.reduce((a,c)=>a+(parseFloat(c.totalWeight)||0),0).toFixed(1)} KG</span><small>WEIGHT</small></div>
+        <div className="stat-card"><span className="stat-val">{items.reduce((acc, curr) => acc + (parseFloat(curr.tradePrice) * parseFloat(curr.totalPcs) || 0), 0).toLocaleString()}</span><small>VALUE</small></div>
       </div>
 
       <div className="table-responsive">
@@ -116,10 +116,10 @@ const InventoryView = ({ onEdit }) => {
           <thead>
             <tr>
               <th>Image</th>
-              <th>Product & SKU</th>
-              <th>Labels (Click Pic)</th>
-              <th>Stock Info</th>
-              <th>Price Details</th>
+              <th>Product Info</th>
+              <th>Labels</th>
+              <th>Stock</th>
+              <th>Pricing</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -130,43 +130,45 @@ const InventoryView = ({ onEdit }) => {
 
               return (
                 <tr key={item.id}>
-                  <td><img src={item.imageUrl} className="item-img" alt="P"/></td>
+                  <td><img src={item.imageUrl} className="item-img" alt="Product"/></td>
                   <td>
                     <div style={{fontWeight:'bold', color:'#f59e0b'}}>{item.name}</div>
-                    <div style={{fontSize:'11px'}}>{item.sku}</div>
-                    <div style={{fontSize:'10px', color:'#666'}}>{item.warehouse}</div>
+                    <div style={{fontSize:'11px', color:'#999'}}>{item.sku}</div>
                   </td>
                   <td>
-                    <div style={{display:'flex', gap:'8px'}}>
+                    <div style={{display:'flex', gap:'6px'}}>
                       <div className="label-clickable" onClick={(e) => downloadLabel(e, item.id, 'bc')}>
-                        <Barcode id={`bc-${item.id}`} value={bCode} width={0.8} height={30} fontSize={8} margin={0} />
+                        <Barcode id={`bc-${item.id}`} value={bCode} width={0.6} height={25} fontSize={8} margin={0} />
                       </div>
                       <div className="label-clickable" onClick={(e) => downloadLabel(e, item.id, 'qr')}>
-                        <QRCodeSVG id={`qr-${item.id}`} value={qCode} size={45} level="H" />
+                        <QRCodeSVG id={`qr-${item.id}`} value={qCode} size={40} level="H" />
                       </div>
                     </div>
                   </td>
                   <td>
                     <div style={{fontWeight:'bold'}}>{item.openingStock} Boxes</div>
-                    <div style={{fontSize:'12px'}}>{item.totalPcs} Pcs</div>
+                    <div style={{fontSize:'11px', color:'#f59e0b'}}>{item.totalPcs} Pcs</div>
                   </td>
                   <td>
                     <div style={{fontSize:'12px'}}>PUR: {item.purchasePrice}</div>
-                    <div style={{fontSize:'12px'}}>TP: {item.tradePrice}</div>
                     <div style={{fontSize:'12px', color:'#f59e0b'}}>RP: {item.retailPrice}</div>
                   </td>
-                  <td>
+                  <td style={{position: 'relative'}}>
                     <button 
+                      type="button"
                       className="action-btn edit-btn" 
+                      style={{ position: 'relative', zIndex: 999, cursor: 'pointer' }}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        console.log("Edit Clicked for:", item.name); // Debug log
                         onEdit(item);
                       }}
                     >
                       EDIT
                     </button>
                     <button 
+                      type="button"
                       className="action-btn delete-btn" 
                       onClick={(e) => handleDelete(e, item.id)}
                     >

@@ -3,51 +3,38 @@ import { db } from '../firebase';
 import { collection, onSnapshot } from "firebase/firestore";
 
 const DashboardSummary = () => {
-  const [counts, setCounts] = useState({ items: 0, sales: 0, lowStock: 0 });
+  const [stats, setStats] = useState({ purchase: 0, sales: 0, profit: 0 });
 
   useEffect(() => {
-    const unsubInv = onSnapshot(collection(db, "inventory_records"), (snap) => {
-      const items = snap.docs.map(doc => doc.data());
-      const low = items.filter(i => parseInt(i.stock) < 10).length;
-      setCounts(prev => ({ ...prev, items: snap.size, lowStock: low }));
+    onSnapshot(collection(db, "sales_records"), (snap) => {
+      let totalS = 0;
+      snap.docs.forEach(doc => totalS += doc.data().totalAmount);
+      setStats(prev => ({ ...prev, sales: totalS }));
     });
 
-    const unsubSales = onSnapshot(collection(db, "sales_records"), (snap) => {
-      setCounts(prev => ({ ...prev, sales: snap.size }));
+    onSnapshot(collection(db, "inventory_records"), (snap) => {
+      let totalP = 0;
+      snap.docs.forEach(doc => totalP += (doc.data().purchasePrice * doc.data().stock));
+      setStats(prev => ({ ...prev, purchase: totalP }));
     });
-
-    return () => { unsubInv(); unsubSales(); };
   }, []);
 
   return (
-    <div style={{ padding: '10px' }}>
-      <h1 style={{ color: '#f59e0b', fontSize: '24px' }}>Welcome to GEMINI IMS</h1>
-      <p style={{ color: '#666' }}>Yahan aapka business ka mukammal khulasa (Summary) hai.</p>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginTop: '30px' }}>
-        <div style={cardStyle('#f59e0b')}>
-          <span style={{ fontSize: '30px' }}>📦</span>
-          <h3>Total Items</h3>
-          <h2 style={{ margin: 0 }}>{counts.items}</h2>
-        </div>
-        <div style={cardStyle('#10b981')}>
-          <span style={{ fontSize: '30px' }}>💰</span>
-          <h3>Total Sales</h3>
-          <h2 style={{ margin: 0 }}>{counts.sales}</h2>
-        </div>
-        <div style={cardStyle('#ef4444')}>
-          <span style={{ fontSize: '30px' }}>⚠️</span>
-          <h3>Low Stock</h3>
-          <h2 style={{ margin: 0 }}>{counts.lowStock} Items</h2>
-        </div>
+    <div style={{ gridColumn: '1 / -1', background: 'white', padding: '20px', borderRadius: '20px', marginTop: '10px', display: 'flex', justifyContent: 'space-around', border: '1px solid #e2e8f0' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ color: '#64748b', fontSize: '13px' }}>Total Purchase</div>
+        <div style={{ fontWeight: 'bold', fontSize: '18px' }}>{stats.purchase.toLocaleString()}</div>
+      </div>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ color: '#64748b', fontSize: '13px' }}>Total Sale</div>
+        <div style={{ fontWeight: 'bold', fontSize: '18px' }}>{stats.sales.toLocaleString()}</div>
+      </div>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ color: '#64748b', fontSize: '13px' }}>Gross Profit</div>
+        <div style={{ fontWeight: 'bold', fontSize: '18px', color: '#10b981' }}>{stats.sales - stats.purchase > 0 ? (stats.sales - stats.purchase).toLocaleString() : 0}</div>
       </div>
     </div>
   );
 };
-
-const cardStyle = (color) => ({
-  background: '#111', padding: '25px', borderRadius: '15px', borderLeft: `5px solid ${color}`,
-  boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
-});
 
 export default DashboardSummary;

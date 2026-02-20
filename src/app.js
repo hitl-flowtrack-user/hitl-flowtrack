@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
-
-// --- Imports matching your screenshot exact names ---
-import AddItem from './additem'; 
+import AddItem from './additem';
 import InventoryView from './inventoryview';
 import DashboardSummary from './DashboardSummary';
 import SalesModule from './SalesModule';
@@ -21,105 +19,55 @@ function App() {
   };
 
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { id: 'additem', label: 'Add New Item', icon: '➕' },
-    { id: 'inventory', label: 'Stock View', icon: '📦' },
-    { id: 'sales', label: 'New Sale (POS)', icon: '💰' },
-    { id: 'history', label: 'Sales History', icon: '📜' },
-    { id: 'reports', label: 'Reports & Profit', icon: '📈' },
+    { id: 'dashboard', label: 'Dashboard', icon: '🏠' },
+    { id: 'additem', label: 'Add Stock', icon: '📦' },
+    { id: 'inventory', label: 'Inventory', icon: '📋' },
+    { id: 'sales', label: 'New Sale', icon: '🛒' },
+    { id: 'history', label: 'Invoices', icon: '🧾' },
+    { id: 'reports', label: 'Analytics', icon: '📊' },
     { id: 'expenses', label: 'Expenses', icon: '💸' },
   ];
 
   const styles = `
-    .app-wrapper { display: flex; background: #000; min-height: 100vh; color: #fff; position: relative; font-family: sans-serif; }
-    
-    .sidebar { 
-      width: 260px; background: #111; height: 100vh; position: fixed; 
-      left: ${isSidebarOpen ? '0' : '-260px'}; 
-      transition: 0.3s; z-index: 1000; border-right: 1px solid #222; padding-top: 60px;
-    }
-
-    .sidebar-overlay {
-      display: ${isSidebarOpen ? 'block' : 'none'}; position: fixed; top: 0; left: 0; 
-      width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999;
-    }
-    
-    .menu-btn { 
-      position: fixed; top: 15px; left: 15px; z-index: 1001; background: #f59e0b; 
-      border: none; border-radius: 5px; padding: 8px 12px; cursor: pointer; color: #000; font-weight: bold;
-    }
-
-    .nav-item { 
-      padding: 15px 25px; cursor: pointer; display: flex; align-items: center; gap: 15px;
-      transition: 0.2s; font-weight: 500; color: #aaa;
-    }
-    .nav-item:hover { background: #1a1a1a; color: #f59e0b; }
-    .nav-item.active { background: #1a1a1a; color: #f59e0b; border-left: 4px solid #f59e0b; }
-
-    .main-content { 
-      flex: 1; margin-left: 0; transition: 0.3s; width: 100%;
-      padding: 20px; padding-top: 70px; box-sizing: border-box;
-    }
-
-    .logo-area { padding: 0 25px 30px; border-bottom: 1px solid #222; margin-bottom: 20px; }
-    .logo-text { font-style: italic; font-weight: 900; color: #f59e0b; font-size: 20px; }
+    .app-container { min-height: 100vh; background: #f4f7fe; color: #333; font-family: 'Inter', sans-serif; }
+    .header { background: #1e3a8a; color: white; padding: 20px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .nav-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; padding: 20px; max-width: 600px; margin: 0 auto; }
+    .nav-card { background: white; padding: 25px; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; cursor: pointer; transition: 0.3s; border: 1px solid #e2e8f0; }
+    .nav-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: #3b82f6; }
+    .nav-card i { fontSize: 30px; }
+    .active-view { padding: 20px; max-width: 1200px; margin: 0 auto; }
+    .back-btn { background: #3b82f6; color: white; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; margin-bottom: 20px; }
   `;
 
   return (
-    <div className="app-wrapper">
+    <div className="app-container">
       <style>{styles}</style>
+      <div className="header">
+        <h2 style={{margin:0}}>Mahavir Traders</h2>
+        <div style={{fontSize:'12px'}}>Online POS v3.0</div>
+      </div>
 
-      <button className="menu-btn" onClick={() => setSidebarOpen(!isSidebarOpen)}>
-        {isSidebarOpen ? '✕ Close' : '☰ Menu'}
-      </button>
-
-      <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}></div>
-
-      <nav className="sidebar">
-        <div className="logo-area">
-          <div className="logo-text">GEMINI IMS</div>
-          <small style={{color:'#444'}}>v2.1 Stable</small>
+      {activeTab === 'dashboard' ? (
+        <div className="nav-grid">
+          {menuItems.filter(i => i.id !== 'dashboard').map(item => (
+            <div key={item.id} className="nav-card" onClick={() => setActiveTab(item.id)}>
+              <span style={{fontSize: '32px'}}>{item.icon}</span>
+              <span style={{fontWeight:'bold', color: '#1e3a8a'}}>{item.label}</span>
+            </div>
+          ))}
+          <DashboardSummary />
         </div>
-        {menuItems.map(item => (
-          <div 
-            key={item.id} 
-            className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab(item.id);
-              setSidebarOpen(false);
-              if(item.id !== 'additem') setEditData(null);
-            }}
-          >
-            <span>{item.icon}</span> {item.label}
-          </div>
-        ))}
-      </nav>
-
-      <main className="main-content">
-        {activeTab === 'dashboard' && <DashboardSummary />}
-        
-        {activeTab === 'additem' && (
-          <AddItem 
-            existingItem={editData} 
-            onComplete={() => {
-              setEditData(null);
-              setActiveTab('inventory');
-            }} 
-          />
-        )}
-        
-        {activeTab === 'inventory' && (
-          <InventoryView onEdit={handleEdit} />
-        )}
-
-        {activeTab === 'sales' && <SalesModule />}
-        
-        {activeTab === 'history' && <SalesHistory />}
-
-        {activeTab === 'reports' && <Reports />}
-
-        {activeTab === 'expenses' && <ExpenseTracker />}
-      </main>
+      ) : (
+        <div className="active-view">
+          <button className="back-btn" onClick={() => setActiveTab('dashboard')}>← Main Menu</button>
+          {activeTab === 'additem' && <AddItem existingItem={editData} onComplete={() => { setEditData(null); setActiveTab('inventory'); }} />}
+          {activeTab === 'inventory' && <InventoryView onEdit={handleEdit} />}
+          {activeTab === 'sales' && <SalesModule />}
+          {activeTab === 'history' && <SalesHistory />}
+          {activeTab === 'reports' && <Reports />}
+          {activeTab === 'expenses' && <ExpenseTracker />}
+        </div>
+      )}
     </div>
   );
 }

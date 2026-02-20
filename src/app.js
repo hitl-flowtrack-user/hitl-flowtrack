@@ -5,7 +5,7 @@ import './app.css';
 import Dashboard from './components/dashboard';
 import AddItem from './components/additem';
 import InventoryView from './components/inventoryview';
-import SalesModule from './components/SalesModule';
+import SalesModule from './components/salessodule';
 import Attendance from './components/attendance';
 import DayClosing from './components/dayclosing';
 import FlowView from './components/flowView';

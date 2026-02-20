@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
-import AddItem from './additem';
-import InventoryView from './inventoryview';
-import DashboardSummary from './DashboardSummary';
-import SalesModule from './SalesModule';
-import SalesHistory from './SalesHistory';
-import Reports from './Reports'; 
-import ExpenseTracker from './ExpenseTracker';
+import './app.css';
+
+// Components Imports (Files inside components folder)
+import Dashboard from './components/dashboard';
+import AddItem from './components/additem';
+import InventoryView from './components/inventoryview';
+import SalesModule from './components/SalesModule';
+import Attendance from './components/attendance';
+import DayClosing from './components/dayclosing';
+import FlowView from './components/flowView';
+import Navbar from './components/navbar';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -16,52 +20,26 @@ function App() {
     setActiveTab('additem');
   };
 
-  const navItems = [
-    { id: 'dashboard', label: 'Home', icon: '🏠' },
-    { id: 'sales', label: 'POS Sale', icon: '🛒' },
-    { id: 'inventory', label: 'Stock', icon: '📋' },
-    { id: 'additem', label: 'Add Item', icon: '📦' },
-    { id: 'history', label: 'Invoices', icon: '🧾' },
-    { id: 'expenses', label: 'Expenses', icon: '💸' },
-    { id: 'reports', label: 'Reports', icon: '📊' }
-  ];
-
   return (
-    <div style={{ minHeight: '100vh', background: '#f4f7fe', fontFamily: 'sans-serif' }}>
-      <header style={{ background: '#1e3a8a', color: 'white', padding: '15px 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
-        <h2 style={{ margin: 0 }}>Mahavir Traders</h2>
-        <div style={{ fontSize: '12px', background: '#3b82f6', padding: '4px 10px', borderRadius: '20px' }}>v3.5 Final Build</div>
-      </header>
-
-      {activeTab === 'dashboard' ? (
-        <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto' }}>
-          <DashboardSummary />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px', marginTop: '25px' }}>
-            {navItems.filter(i => i.id !== 'dashboard').map(item => (
-              <div key={item.id} onClick={() => setActiveTab(item.id)} style={cardStyle}>
-                <span style={{ fontSize: '35px' }}>{item.icon}</span>
-                <span style={{ fontWeight: 'bold', color: '#1e3a8a', marginTop: '10px' }}>{item.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div style={{ padding: '20px' }}>
-          <button onClick={() => setActiveTab('dashboard')} style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', marginBottom: '20px', fontWeight: 'bold' }}>
-            ← Main Menu
-          </button>
-          {activeTab === 'additem' && <AddItem existingItem={editData} onComplete={() => { setEditData(null); setActiveTab('inventory'); }} />}
-          {activeTab === 'inventory' && <InventoryView onEdit={handleEdit} />}
-          {activeTab === 'sales' && <SalesModule />}
-          {activeTab === 'history' && <SalesHistory />}
-          {activeTab === 'reports' && <Reports />}
-          {activeTab === 'expenses' && <ExpenseTracker />}
-        </div>
-      )}
+    <div className="app-container">
+      <Navbar setActiveTab={setActiveTab} activeTab={activeTab} />
+      
+      <main className="content-area" style={{ padding: '20px' }}>
+        {activeTab === 'dashboard' && <Dashboard />}
+        {activeTab === 'additem' && (
+          <AddItem 
+            existingItem={editData} 
+            onComplete={() => { setEditData(null); setActiveTab('inventory'); }} 
+          />
+        )}
+        {activeTab === 'inventory' && <InventoryView onEdit={handleEdit} />}
+        {activeTab === 'sales' && <SalesModule />}
+        {activeTab === 'attendance' && <Attendance />}
+        {activeTab === 'flow' && <FlowView />}
+        {activeTab === 'closing' && <DayClosing />}
+      </main>
     </div>
   );
 }
-
-const cardStyle = { background: 'white', padding: '25px', borderRadius: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', border: '1px solid #e2e8f0', transition: '0.2s', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' };
 
 export default App;

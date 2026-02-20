@@ -18,7 +18,7 @@ function App() {
     setEditData(item);
     setActiveTab('additem');
     setSidebarOpen(false);
-  };
+  }; 
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },

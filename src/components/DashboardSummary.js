@@ -3,35 +3,34 @@ import { db } from '../firebase';
 import { collection, onSnapshot } from "firebase/firestore";
 
 const DashboardSummary = () => {
-  const [stats, setStats] = useState({ purchase: 0, sales: 0, profit: 0 });
+  const [stats, setStats] = useState({ purchase: 0, sales: 0, stockCount: 0 });
 
   useEffect(() => {
-    onSnapshot(collection(db, "sales_records"), (snap) => {
-      let totalS = 0;
-      snap.docs.forEach(doc => totalS += doc.data().totalAmount);
-      setStats(prev => ({ ...prev, sales: totalS }));
+    const unsubInv = onSnapshot(collection(db, "inventory_records"), (snap) => {
+      let p = 0;
+      snap.docs.forEach(doc => p += (parseFloat(doc.data().purchasePrice || 0) * parseFloat(doc.data().stock || 0)));
+      setStats(prev => ({ ...prev, purchase: p, stockCount: snap.size }));
     });
 
-    onSnapshot(collection(db, "inventory_records"), (snap) => {
-      let totalP = 0;
-      snap.docs.forEach(doc => totalP += (doc.data().purchasePrice * doc.data().stock));
-      setStats(prev => ({ ...prev, purchase: totalP }));
+    const unsubSales = onSnapshot(collection(db, "sales_records"), (snap) => {
+      let s = 0;
+      snap.docs.forEach(doc => s += parseFloat(doc.data().totalAmount || 0));
+      setStats(prev => ({ ...prev, sales: s }));
     });
+
+    return () => { unsubInv(); unsubSales(); };
   }, []);
 
   return (
-    <div style={{ gridColumn: '1 / -1', background: 'white', padding: '20px', borderRadius: '20px', marginTop: '10px', display: 'flex', justifyContent: 'space-around', border: '1px solid #e2e8f0' }}>
+    <div style={{ background: 'white', padding: '25px', borderRadius: '20px', display: 'flex', justifyContent: 'space-around', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ color: '#64748b', fontSize: '13px' }}>Total Purchase</div>
-        <div style={{ fontWeight: 'bold', fontSize: '18px' }}>{stats.purchase.toLocaleString()}</div>
+        <div style={{ color: '#64748b', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '1px' }}>Inventory Value</div>
+        <div style={{ fontWeight: 'bold', fontSize: '22px', color: '#1e3a8a' }}>Rs. {stats.purchase.toLocaleString()}</div>
       </div>
+      <div style={{ width: '1px', background: '#e2e8f0' }}></div>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ color: '#64748b', fontSize: '13px' }}>Total Sale</div>
-        <div style={{ fontWeight: 'bold', fontSize: '18px' }}>{stats.sales.toLocaleString()}</div>
-      </div>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ color: '#64748b', fontSize: '13px' }}>Gross Profit</div>
-        <div style={{ fontWeight: 'bold', fontSize: '18px', color: '#10b981' }}>{stats.sales - stats.purchase > 0 ? (stats.sales - stats.purchase).toLocaleString() : 0}</div>
+        <div style={{ color: '#64748b', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '1px' }}>Total Sales</div>
+        <div style={{ fontWeight: 'bold', fontSize: '22px', color: '#10b981' }}>Rs. {stats.sales.toLocaleString()}</div>
       </div>
     </div>
   );

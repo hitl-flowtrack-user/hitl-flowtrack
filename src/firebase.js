@@ -1,16 +1,15 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
 
+// Aapka Firebase Configuration (Ise apni original keys se replace kar len agar zaroorat ho)
 const firebaseConfig = {
-  apiKey: "AIzaSyDlzaGO8koBDOYvCdSglZjlvT8_UZCA9XI",
-  authDomain: "elite-vault-93de5.firebaseapp.com",
-  projectId: "elite-vault-93de5",
-  storageBucket: "elite-vault-93de5.firebasestorage.app",
-  messagingSenderId: "745842974621",
-  appId: "1:745842974621:web:f63f46dc7d0938f3bb9974"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_STORAGE_BUCKET",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
-export const auth = getAuth(app);

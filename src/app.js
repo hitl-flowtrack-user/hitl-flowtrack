@@ -9,57 +9,47 @@ import ExpenseTracker from './ExpenseTracker';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [editData, setEditData] = useState(null);
 
   const handleEdit = (item) => {
     setEditData(item);
     setActiveTab('additem');
-    setSidebarOpen(false);
   };
 
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: '🏠' },
-    { id: 'additem', label: 'Add Stock', icon: '📦' },
-    { id: 'inventory', label: 'Inventory', icon: '📋' },
-    { id: 'sales', label: 'New Sale', icon: '🛒' },
+  const navItems = [
+    { id: 'dashboard', label: 'Home', icon: '🏠' },
+    { id: 'sales', label: 'POS Sale', icon: '🛒' },
+    { id: 'inventory', label: 'Stock', icon: '📋' },
+    { id: 'additem', label: 'Add Item', icon: '📦' },
     { id: 'history', label: 'Invoices', icon: '🧾' },
-    { id: 'reports', label: 'Analytics', icon: '📊' },
     { id: 'expenses', label: 'Expenses', icon: '💸' },
+    { id: 'reports', label: 'Reports', icon: '📊' }
   ];
 
-  const styles = `
-    .app-container { min-height: 100vh; background: #f4f7fe; color: #333; font-family: 'Inter', sans-serif; }
-    .header { background: #1e3a8a; color: white; padding: 20px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-    .nav-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; padding: 20px; max-width: 600px; margin: 0 auto; }
-    .nav-card { background: white; padding: 25px; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; cursor: pointer; transition: 0.3s; border: 1px solid #e2e8f0; }
-    .nav-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: #3b82f6; }
-    .nav-card i { fontSize: 30px; }
-    .active-view { padding: 20px; max-width: 1200px; margin: 0 auto; }
-    .back-btn { background: #3b82f6; color: white; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; margin-bottom: 20px; }
-  `;
-
   return (
-    <div className="app-container">
-      <style>{styles}</style>
-      <div className="header">
-        <h2 style={{margin:0}}>Mahavir Traders</h2>
-        <div style={{fontSize:'12px'}}>Online POS v3.0</div>
-      </div>
+    <div style={{ minHeight: '100vh', background: '#f4f7fe', fontFamily: 'Inter, sans-serif' }}>
+      <header style={{ background: '#1e3a8a', color: 'white', padding: '15px 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h2 style={{ margin: 0 }}>Mahavir Traders</h2>
+        <div style={{ fontSize: '12px', opacity: 0.8 }}>POS System v3.1</div>
+      </header>
 
       {activeTab === 'dashboard' ? (
-        <div className="nav-grid">
-          {menuItems.filter(i => i.id !== 'dashboard').map(item => (
-            <div key={item.id} className="nav-card" onClick={() => setActiveTab(item.id)}>
-              <span style={{fontSize: '32px'}}>{item.icon}</span>
-              <span style={{fontWeight:'bold', color: '#1e3a8a'}}>{item.label}</span>
-            </div>
-          ))}
+        <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto' }}>
           <DashboardSummary />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px', marginTop: '20px' }}>
+            {navItems.filter(i => i.id !== 'dashboard').map(item => (
+              <div key={item.id} onClick={() => setActiveTab(item.id)} style={cardStyle}>
+                <span style={{ fontSize: '30px' }}>{item.icon}</span>
+                <span style={{ fontWeight: 'bold', color: '#1e3a8a', marginTop: '10px' }}>{item.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
       ) : (
-        <div className="active-view">
-          <button className="back-btn" onClick={() => setActiveTab('dashboard')}>← Main Menu</button>
+        <div style={{ padding: '20px' }}>
+          <button onClick={() => setActiveTab('dashboard')} style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', marginBottom: '20px' }}>
+            ← Back to Home
+          </button>
           {activeTab === 'additem' && <AddItem existingItem={editData} onComplete={() => { setEditData(null); setActiveTab('inventory'); }} />}
           {activeTab === 'inventory' && <InventoryView onEdit={handleEdit} />}
           {activeTab === 'sales' && <SalesModule />}
@@ -71,5 +61,7 @@ function App() {
     </div>
   );
 }
+
+const cardStyle = { background: 'white', padding: '25px', borderRadius: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', border: '1px solid #e2e8f0', transition: '0.3s' };
 
 export default App;

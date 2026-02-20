@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './components/App'; // App file components folder ke andar hai
+import App from './components/app'; // Path as per your structure
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

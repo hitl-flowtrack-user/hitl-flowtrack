@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-// Path: ../firebase kyunke ye file components folder ke andar hai
 import { db } from '../firebase'; 
 import { collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc } from "firebase/firestore";
 
@@ -8,7 +7,6 @@ const ExpenseTracker = () => {
   const [list, setList] = useState([]);
 
   useEffect(() => {
-    // Firebase se expenses mangwana
     const q = query(collection(db, "expenses_records"), orderBy("timestamp", "desc"));
     const unsub = onSnapshot(q, (snap) => {
       setList(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -18,7 +16,7 @@ const ExpenseTracker = () => {
 
   const addExpense = async (e) => {
     e.preventDefault();
-    if (!expense.title || !expense.amount) return alert("Please fill Title and Amount!");
+    if (!expense.title || !expense.amount) return alert("Title aur Amount zaroori hain!");
     
     try {
       await addDoc(collection(db, "expenses_records"), {
@@ -28,52 +26,57 @@ const ExpenseTracker = () => {
         timestamp: new Date(),
         dateString: new Date().toLocaleDateString()
       });
-      // Form khali karna
       setExpense({ title: '', amount: '', note: '' });
-      alert("Expense Added Successfully!");
-    } catch (err) { 
-      console.error("Error adding expense: ", err);
-      alert("Error: " + err.message);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const deleteExpense = async (id) => {
-    if (window.confirm("Are you sure you want to delete this expense?")) {
-      try {
-        await deleteDoc(doc(db, "expenses_records", id));
-      } catch (err) {
-        console.error("Error deleting: ", err);
-      }
+    if (window.confirm("Kya aap ye kharcha delete karna chahte hain?")) {
+      await deleteDoc(doc(db, "expenses_records", id));
     }
   };
 
-  // UI Styles
-  const containerStyle = { maxWidth: '800px', margin: '0 auto', fontFamily: 'sans-serif' };
-  const cardStyle = { background: 'white', padding: '25px', borderRadius: '15px', border: '1px solid #e2e8f0', marginBottom: '20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' };
-  const inputStyle = { padding: '12px', border: '1px solid #ddd', borderRadius: '8px', marginBottom: '10px', width: '100%', boxSizing: 'border-box' };
-  const btnStyle = { background: '#ef4444', color: 'white', padding: '12px', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', width: '100%' };
-
   return (
-    <div style={containerStyle}>
-      <div style={cardStyle}>
-        <h2 style={{ color: '#1e3a8a', marginTop: 0 }}>💸 Expense Tracker</h2>
-        <form onSubmit={addExpense}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            <input 
-              style={inputStyle} placeholder="Expense Title (e.g. Electricity Bill)" 
-              value={expense.title} onChange={e => setExpense({...expense, title: e.target.value})} 
-            />
-            <input 
-              style={inputStyle} type="number" placeholder="Amount (Rs.)" 
-              value={expense.amount} onChange={e => setExpense({...expense, amount: e.target.value})} 
-            />
-          </div>
+    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+      <div style={{ background: 'white', padding: '25px', borderRadius: '20px', border: '1px solid #e2e8f0', marginBottom: '25px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+        <h2 style={{ color: '#1e3a8a', marginTop: 0 }}>💸 Daily Expenses</h2>
+        <form onSubmit={addExpense} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '10px' }}>
           <input 
-            style={inputStyle} placeholder="Optional Note" 
-            value={expense.note} onChange={e => setExpense({...expense, note: e.target.value})} 
+            style={inputStyle} placeholder="Kharchay ka Naam" 
+            value={expense.title} onChange={e => setExpense({...expense, title: e.target.value})} 
           />
-          <button type="submit" style={btnStyle}>SAVE EXPENSE</button>
+          <input 
+            style={inputStyle} type="number" placeholder="Raqam (Rs.)" 
+            value={expense.amount} onChange={e => setExpense({...expense, amount: e.target.value})} 
+          />
+          <button style={{ background: '#ef4444', color: 'white', padding: '12px 20px', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>
+            ADD
+          </button>
         </form>
       </div>
 
-      <div style={{ background: 'white', borderRadius: '15px', border: '1px solid #e2e8f0
+      <div style={{ background: 'white', borderRadius: '20px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+        <div style={{ background: '#f8fafc', padding: '15px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
+          <span>Expense List</span>
+          <span style={{ color: '#ef4444' }}>Total: Rs. {list.reduce((acc, curr) => acc + curr.amount, 0).toLocaleString()}</span>
+        </div>
+        {list.map((ex) => (
+          <div key={ex.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', borderBottom: '1px solid #f1f5f9' }}>
+            <div>
+              <div style={{ fontWeight: 'bold' }}>{ex.title}</div>
+              <div style={{ fontSize: '11px', color: '#94a3b8' }}>{ex.dateString}</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <span style={{ color: '#ef4444', fontWeight: 'bold' }}>Rs. {ex.amount}</span>
+              <button onClick={() => deleteExpense(ex.id)} style={{ background: 'none', border: 'none', color: '#cbd5e1', cursor: 'pointer' }}>🗑️</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const inputStyle = { padding: '12px', border: '1px solid #e2e8f0', borderRadius: '10px' };
+
+export default ExpenseTracker;

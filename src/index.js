@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './components/app'; // Path as per your structure
+import App from './components/app'; // Path matching your app.js location
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './components/app'; // Path matching your app.js location
+import './index.css';
+import App from './app'; // app.js bahar hai isliye path ./app hai
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

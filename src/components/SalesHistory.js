@@ -7,33 +7,23 @@ const SalesHistory = () => {
 
   useEffect(() => {
     const q = query(collection(db, "sales_records"), orderBy("timestamp", "desc"));
-    const unsub = onSnapshot(q, (snapshot) => {
-      setHistory(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    return onSnapshot(q, (snap) => {
+      setHistory(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    return unsub;
   }, []);
 
   return (
-    <div>
-      <h2 style={{ color: '#f59e0b', marginBottom: '20px' }}>📜 Sales History</h2>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-        {history.map(sale => (
-          <div key={sale.id} style={{ background: '#111', padding: '20px', borderRadius: '10px', border: '1px solid #222' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-              <span style={{ fontWeight: 'bold', color: '#f59e0b' }}>{sale.customerName}</span>
-              <span style={{ color: '#666' }}>{sale.dateString}</span>
-            </div>
-            <div style={{ fontSize: '14px', color: '#aaa' }}>
-              {sale.cart?.map((c, i) => (
-                <div key={i}>{c.name} (x{c.qty}) - Rs. {c.retailPrice * c.qty}</div>
-              ))}
-            </div>
-            <div style={{ textAlign: 'right', marginTop: '10px', fontWeight: 'bold', borderTop: '1px solid #222', paddingTop: '10px' }}>
-              Total Amount: Rs. {sale.totalAmount}
-            </div>
+    <div style={{ background: 'white', padding: '20px', borderRadius: '15px', border: '1px solid #e2e8f0' }}>
+      <h3 style={{ color: '#1e3a8a' }}>Recent Invoices</h3>
+      {history.map(sale => (
+        <div key={sale.id} style={{ padding: '15px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontWeight: 'bold' }}>{sale.customerName}</div>
+            <div style={{ fontSize: '12px', color: '#94a3b8' }}>{sale.dateString}</div>
           </div>
-        ))}
-      </div>
+          <div style={{ fontWeight: 'bold', color: '#10b981' }}>Rs. {sale.totalAmount}</div>
+        </div>
+      ))}
     </div>
   );
 };

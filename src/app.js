@@ -4,6 +4,9 @@ import InventoryView from './components/inventoryview';
 import DashboardSummary from './components/DashboardSummary';
 import SalesModule from './components/SalesModule';
 import SalesHistory from './components/SalesHistory';
+// Naye modules jo hum ne add kiye hain
+import Reports from './components/Reports';
+import ExpenseTracker from './components/ExpenseTracker';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -23,6 +26,8 @@ function App() {
     { id: 'inventory', label: 'Stock View', icon: '📦' },
     { id: 'sales', label: 'New Sale (POS)', icon: '💰' },
     { id: 'history', label: 'Sales History', icon: '📜' },
+    { id: 'reports', label: 'Reports & Profit', icon: '📈' }, 
+    { id: 'expenses', label: 'Expenses', icon: '💸' },      
   ];
 
   const styles = `
@@ -84,7 +89,7 @@ function App() {
             onClick={() => {
               setActiveTab(item.id);
               setSidebarOpen(false);
-              if(item.id !== 'additem') setEditData(null); // Clear edit data if moving away
+              if(item.id !== 'additem') setEditData(null); 
             }}
           >
             <span>{item.icon}</span> {item.label}
@@ -113,6 +118,10 @@ function App() {
         {activeTab === 'sales' && <SalesModule />}
         
         {activeTab === 'history' && <SalesHistory />}
+
+        {/* Naye Modules */}
+        {activeTab === 'reports' && <Reports />}
+        {activeTab === 'expenses' && <ExpenseTracker />}
       </main>
     </div>
   );

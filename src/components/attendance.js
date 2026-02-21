@@ -1,54 +1,67 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy } from "firebase/firestore";
 
-const Attendance = ({ onMarked }) => {
-  const [status, setStatus] = useState("Mark Attendance to Unlock System");
-  const [loading, setLoading] = useState(false);
+const Attendance = () => {
+  const [staffName, setStaffName] = useState('');
+  const [records, setRecords] = useState([]);
 
-  const markAttendance = async () => {
-    setLoading(true);
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(async (position) => {
-        const { latitude, longitude } = position.coords;
-        
-        try {
-          await addDoc(collection(db, "daily_attendance"), {
-            userId: "Admin", // Baad mein Auth se connect karenge
-            time: new Date().toLocaleString(),
-            lat: latitude,
-            lng: longitude,
-            date: new Date().toLocaleDateString()
-          });
-          
-          localStorage.setItem("attendance_done", new Date().toLocaleDateString());
-          setStatus("Attendance Marked! System Unlocked.");
-          onMarked(true);
-        } catch (e) {
-          alert("Error marking attendance: " + e.message);
-        }
+  useEffect(() => {
+    const q = query(collection(db, "attendance_records"), orderBy("timestamp", "desc"));
+    return onSnapshot(q, (snap) => {
+      setRecords(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+  }, []);
+
+  const markAttendance = async (status) => {
+    if (!staffName) return alert("Bhai, pehle naam to likhen!");
+    try {
+      await addDoc(collection(db, "attendance_records"), {
+        name: staffName,
+        status: status,
+        time: new Date().toLocaleTimeString(),
+        date: new Date().toLocaleDateString(),
+        timestamp: new Date()
       });
-    } else {
-      alert("Geolocation is not supported by this browser.");
-    }
-    setLoading(false);
+      setStaffName('');
+      alert(`Attendance marked: ${status}`);
+    } catch (e) { console.error(e); }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-white p-6">
-      <h1 className="text-3xl font-bold mb-4">HITL FlowTrack</h1>
-      <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-blue-500 text-center">
-        <p className="mb-6 text-gray-300">{status}</p>
-        <button 
-          onClick={markAttendance}
-          disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full transition-all transform hover:scale-105"
-        >
-          {loading ? "Verifying..." : "Mark Attendance (Face/GPS)"}
-        </button>
+    <div style={{ background: '#000', minHeight: '100vh', padding: '15px', color: '#fff' }}>
+      <h2 style={{ color: '#f59e0b', textAlign: 'center' }}>👥 Staff Attendance</h2>
+      
+      <div style={{ background: '#111', padding: '20px', borderRadius: '15px', border: '1px solid #333', marginBottom: '20px' }}>
+        <input 
+          style={inputStyle} 
+          placeholder="Enter Staff Name" 
+          value={staffName} 
+          onChange={(e) => setStaffName(e.target.value)} 
+        />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
+          <button onClick={() => markAttendance('PRESENT')} style={btnStyle('#10b981')}>PRESENT</button>
+          <button onClick={() => markAttendance('ABSENT')} style={btnStyle('#ef4444')}>ABSENT</button>
+        </div>
+      </div>
+
+      <div style={{ background: '#111', borderRadius: '15px', overflow: 'hidden', border: '1px solid #333' }}>
+        <div style={{ background: '#222', padding: '10px', fontWeight: 'bold', color: '#f59e0b' }}>Recent History</div>
+        {records.map(r => (
+          <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', borderBottom: '1px solid #222' }}>
+            <div>
+              <div style={{ fontWeight: 'bold' }}>{r.name}</div>
+              <div style={{ fontSize: '10px', color: '#666' }}>{r.date} | {r.time}</div>
+            </div>
+            <span style={{ color: r.status === 'PRESENT' ? '#10b981' : '#ef4444', fontWeight: 'bold' }}>{r.status}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
 };
+
+const inputStyle = { width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #f59e0b', background: '#000', color: '#fff', boxSizing: 'border-box' };
+const btnStyle = (col) => ({ background: col, color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' });
 
 export default Attendance;

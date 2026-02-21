@@ -102,9 +102,9 @@ function App() {
       {/* Logout button (Temporary for testing) */}
       <button 
         onClick={handleLogout}
-        style={{ position: 'fixed', top: '10px', right: '10px', background: 'red', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '5px', fontSize: '10px', zIndex: 2000 }}
+        style={{ position: 'fixed', top: '10px', right: '10px', background: 'red', color: 'white', border: '1px', padding: '5px 10px', borderRadius: '5px', fontSize: '20px', zIndex: 2000 }}
       >
-        Force Logout
+        Logout
       </button>
 
       {activeTab !== 'dashboard' && (

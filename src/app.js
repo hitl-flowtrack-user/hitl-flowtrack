@@ -5,7 +5,8 @@ import './app.css';
 import { auth } from './firebase'; 
 import { onAuthStateChanged } from "firebase/auth";
 
-// Lowercase Imports (GitHub names match)
+// Components Imports
+import login from './components/login';
 import dashboard from './components/dashboard';
 import additem from './components/additem';
 import inventoryview from './components/inventoryview';
@@ -14,10 +15,8 @@ import attendance from './components/attendance';
 import dayclosing from './components/dayclosing';
 import flowview from './components/flowview';
 import navbar from './components/navbar';
-import login from './components/login';
-import reports from './components/reports';
 
-// Capitalized for React
+const Login = login;
 const Dashboard = dashboard;
 const AddItem = additem;
 const InventoryView = inventoryview;
@@ -26,8 +25,6 @@ const Attendance = attendance;
 const DayClosing = dayclosing;
 const FlowView = flowview;
 const Navbar = navbar;
-const Login = login;
-const Reports = reports;
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -56,41 +53,33 @@ function App() {
   if (authLoading) {
     return (
       <div style={{ background: '#000', height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#f59e0b' }}>
-        <h3>MAHAVIR POS LOADING...</h3>
+        <h3>HITL-FLOWTRACK LOADING...</h3>
       </div>
     );
   }
 
+  // AGAR LOGIN NAHI HAI TO LOGIN PAGE DIKHAYEGA
   if (!isLoggedIn) {
     return <Login onLoginSuccess={() => setIsLoggedIn(true)} />;
   }
 
   return (
     <div className="app-container" style={{ background: '#000', minHeight: '100vh', color: '#fff' }}>
-      
       {activeTab !== 'dashboard' && <Navbar setActiveTab={setActiveTab} activeTab={activeTab} />}
 
       <main className="content-area">
         {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
-        
         {activeTab === 'additem' && (
           <AddItem 
             existingItem={editData} 
             onComplete={() => { setEditData(null); setActiveTab('inventoryview'); }} 
           />
         )}
-        
         {activeTab === 'inventoryview' && <InventoryView onEdit={handleEdit} />}
-        
         {activeTab === 'salesmodule' && <SalesModule />}
-        
         {activeTab === 'attendance' && <Attendance />}
-        
         {activeTab === 'dayclosing' && <DayClosing />}
-        
         {activeTab === 'flowview' && <FlowView />}
-        
-        {activeTab === 'reports' && <Reports />}
       </main>
 
       {activeTab !== 'dashboard' && (

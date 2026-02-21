@@ -2,19 +2,18 @@ import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
-// ⚠️ Sab se pehle Firebase Console se naye details copy karein
 const firebaseConfig = {
-  apiKey: "AIzaSy........................", // Yahan apni API Key bina kisi space ke likhen
-  authDomain: "hitl-flowtrack.firebaseapp.com",
-  projectId: "hitl-flowtrack",
-  storageBucket: "hitl-flowtrack.appspot.com",
-  messagingSenderId: "367341951508", 
-  appId: "1:367341951508:web:abcdef123456" 
+  apiKey: "AIzaSyDlzaGO8koBDOYvCdSglZjlvT8_UZCA9XI",
+  authDomain: "elite-vault-93de5.firebaseapp.com",
+  projectId: "elite-vault-93de5",
+  storageBucket: "elite-vault-93de5.firebasestorage.app",
+  messagingSenderId: "745842974621",
+  appId: "1:745842974621:web:f63f46dc7d0938f3bb9974"
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Export Services
+// YE EXPORTS BOHT ZAROORI HAIN
 export const db = getFirestore(app);
 export const auth = getAuth(app);

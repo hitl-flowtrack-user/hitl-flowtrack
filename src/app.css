@@ -1,38 +1,120 @@
-.App {
-  text-align: center;
+/* --- Global Styles --- */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+body {
+  background-color: #000;
+  color: #fff;
+  overflow-x: hidden;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
+/* --- Main Layout Container --- */
+.app-container {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
 }
 
-.App-link {
-  color: #61dafb;
+.content-area {
+  flex: 1;
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
+/* --- Common UI Components --- */
+h2, h3 {
+  color: #f59e0b;
+  margin-bottom: 15px;
+  letter-spacing: 1px;
+}
+
+button {
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border-radius: 10px;
+  font-weight: bold;
+}
+
+button:active {
+  transform: scale(0.95);
+}
+
+input, select {
+  width: 100%;
+  padding: 12px;
+  background: #111;
+  border: 1px solid #333;
+  color: #fff;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  font-size: 16px; /* Mobile par auto-zoom roknay ke liye */
+}
+
+input:focus {
+  border-color: #f59e0b;
+  outline: none;
+}
+
+/* --- Custom Scrollbar --- */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #000;
+}
+::-webkit-scrollbar-thumb {
+  background: #f59e0b;
+  border-radius: 10px;
+}
+
+/* --- Mobile Specific Adjustments (Responsive) --- */
+@media (max-width: 768px) {
+  .content-area {
+    padding: 10px;
   }
-  to {
-    transform: rotate(360deg);
+
+  h2 {
+    font-size: 1.4rem;
+    text-align: center;
   }
+
+  /* Grid Layouts for Mobile */
+  .dashboard-grid, .sales-grid {
+    grid-template-columns: repeat(2, 1fr) !important; /* Mobile par 2 columns */
+    gap: 10px !important;
+  }
+
+  /* Bottom Navigation/Cart Support */
+  .fixed-bottom-cart {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 15px;
+    background: #1a1a1a;
+    border-top: 2px solid #f59e0b;
+    z-index: 1000;
+  }
+
+  /* Buttons on Mobile */
+  .mobile-full-btn {
+    width: 100% !important;
+    padding: 15px !important;
+  }
+}
+
+/* --- Animation for smooth page changes --- */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.content-area > div {
+  animation: fadeIn 0.4s ease-out;
 }

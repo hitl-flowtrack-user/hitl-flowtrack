@@ -4,12 +4,12 @@ import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import './app.css';
 
-// Modules
+// Components (Hamesha Capital se start karen)
 import Login from './components/login';
 import Dashboard from './components/dashboard';
-import SalesTerminal from './components/salesmodule';
-import InventoryHub from './components/inventoryview';
-import StaffManager from './components/attendance';
+import SalesModule from './components/salesmodule';
+import InventoryView from './components/inventoryview';
+import Attendance from './components/attendance';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -20,9 +20,16 @@ function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
-        const userDoc = await getDoc(doc(db, "authorized_users", currentUser.uid));
-        setUserData(userDoc.exists() ? userDoc.data() : { role: 'user' });
-        setUser(currentUser);
+        try {
+          // Authorized users check
+          const userDoc = await getDoc(doc(db, "authorized_users", currentUser.uid));
+          setUserData(userDoc.exists() ? userDoc.data() : { role: 'user' });
+          setUser(currentUser);
+        } catch (err) {
+          console.error("Firestore Error:", err);
+          setUserData({ role: 'user' });
+          setUser(currentUser);
+        }
       } else {
         setUser(null);
         setUserData(null);
@@ -32,21 +39,27 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  if (loading) return <div className="loader"><span>ORDERFLOW</span></div>;
+  if (loading) return (
+    <div style={{background:'#000', height:'100vh', display:'flex', justifyContent:'center', alignItems:'center'}}>
+      <h3 style={{color:'#f59e0b', letterSpacing:'3px'}}>HITL-FLOWTRACK</h3>
+    </div>
+  );
 
-  // Condition 1 & 2: No Login, No Work
+  // Requirements 1 & 2: No login, no access
   if (!user) return <Login />;
 
   return (
     <div className="app-main">
-      <main className="screen-container">
-        {activeTab === 'dashboard' && <Dashboard userData={userData} setActiveTab={setActiveTab} />}
-        {activeTab === 'sales' && <SalesTerminal />}
-        {activeTab === 'inventory' && <InventoryHub role={userData?.role} />}
-        {activeTab === 'staff' && <StaffManager />}
+      <main className="screen-container" style={{ paddingBottom: '80px' }}>
+        {activeTab === 'dashboard' && (
+          <Dashboard userData={userData} setActiveTab={setActiveTab} onLogout={() => auth.signOut()} />
+        )}
+        {activeTab === 'sales' && <SalesModule />}
+        {activeTab === 'inventory' && <InventoryView role={userData?.role} />}
+        {activeTab === 'staff' && <Attendance />}
       </main>
 
-      {/* Floating Bottom Navigation */}
+      {/* Modern Bottom Navigation */}
       <nav className="bottom-nav">
         <button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'active' : ''}>📊</button>
         <button onClick={() => setActiveTab('sales')} className={activeTab === 'sales' ? 'active' : ''}>🛒</button>

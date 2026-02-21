@@ -5,7 +5,7 @@ import './app.css';
 import { auth } from './firebase'; 
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
-// Components Imports (Lowercase as per your setup)
+// Components Imports
 import login from './components/login';
 import dashboard from './components/dashboard';
 import additem from './components/additem';
@@ -27,20 +27,16 @@ const FlowView = flowview;
 const Navbar = navbar;
 
 function App() {
-  // Default state false honi chahiye taake login page dikhe
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [editData, setEditData] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
-    // Ye function check karta hai ke user waqai login hai ya nahi
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        console.log("User found:", user.email);
         setIsLoggedIn(true);
       } else {
-        console.log("No user logged in.");
         setIsLoggedIn(false);
       }
       setAuthLoading(false);
@@ -48,11 +44,14 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  // Logout function (Aap dashboard mein use kar sakte hain)
   const handleLogout = async () => {
-    await signOut(auth);
-    setIsLoggedIn(false);
-    setActiveTab('dashboard');
+    try {
+      await signOut(auth);
+      setIsLoggedIn(false);
+      setActiveTab('dashboard');
+    } catch (error) {
+      console.error("Logout Error:", error);
+    }
   };
 
   const handleEdit = (item) => {
@@ -60,7 +59,6 @@ function App() {
     setActiveTab('additem');
   };
 
-  // 1. Loading screen
   if (authLoading) {
     return (
       <div style={{ background: '#000', height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#f59e0b' }}>
@@ -69,18 +67,16 @@ function App() {
     );
   }
 
-  // 2. STRICT LOGIN CHECK: Agar isLoggedIn false hai to sirf Login dikhaye
-  if (isLoggedIn === false) {
+  if (!isLoggedIn) {
     return <Login onLoginSuccess={() => setIsLoggedIn(true)} />;
   }
 
-  // 3. Main Dashboard (Sirf login hone par nazar ayega)
   return (
     <div className="app-container" style={{ background: '#000', minHeight: '100vh', color: '#fff' }}>
       
       {activeTab !== 'dashboard' && <Navbar setActiveTab={setActiveTab} activeTab={activeTab} />}
 
-      <main className="content-area" style={{ paddingBottom: '90px' }}>
+      <main className="content-area">
         {activeTab === 'dashboard' && (
           <Dashboard setActiveTab={setActiveTab} onLogout={handleLogout} />
         )}
@@ -98,14 +94,6 @@ function App() {
         {activeTab === 'dayclosing' && <DayClosing />}
         {activeTab === 'flowview' && <FlowView />}
       </main>
-
-      {/* Logout button (Temporary for testing) */}
-      <button 
-        onClick={handleLogout}
-        style={{ position: 'fixed', top: '10px', right: '10px', background: 'red', color: 'white', border: '1px', padding: '5px 10px', borderRadius: '5px', fontSize: '20px', zIndex: 2000 }}
-      >
-        Logout
-      </button>
 
       {activeTab !== 'dashboard' && (
         <button 

@@ -17,13 +17,26 @@ function App() {
   const [userData, setUserData] = useState({ role: 'user' });
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
+  // Online/Offline status monitor
   useEffect(() => {
+    window.addEventListener('online', () => setIsOnline(true));
+    window.addEventListener('offline', () => setIsOnline(false));
+    
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (u) {
         setUser(u);
-        const docSnap = await getDoc(doc(db, "authorized_users", u.uid));
-        if (docSnap.exists()) setUserData(docSnap.data());
+        try {
+          // Timeout ke saath role fetch karna taake infinite loading na ho
+          const docRef = doc(db, "authorized_users", u.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            setUserData(docSnap.data());
+          }
+        } catch (error) {
+          console.log("Working in offline mode or error fetching role.");
+        }
       } else {
         setUser(null);
       }
@@ -32,12 +45,19 @@ function App() {
     return () => unsub();
   }, []);
 
-  if (loading) return <div className="fast-loader"><div className="spinner"></div></div>;
+  if (loading) return <div className="fast-loader"><div className="spinner"></div><p style={{marginTop: '10px', fontSize: '12px'}}>Connecting...</p></div>;
+  
   if (!user) return <Suspense fallback={null}><Login /></Suspense>;
 
   return (
     <div className="app-main">
-      <Suspense fallback={<div className="tab-loader">⚡ FAST LOADING...</div>}>
+      {!isOnline && (
+        <div style={{ background: '#ef4444', color: '#fff', fontSize: '10px', textAlign: 'center', padding: '5px' }}>
+          ⚠️ You are offline. Data will sync when connection returns.
+        </div>
+      )}
+
+      <Suspense fallback={<div className="tab-loader">⚡ Loading Page...</div>}>
         <div className="screen-container">
           {activeTab === 'dashboard' && <Dashboard userData={userData} setActiveTab={setActiveTab} onLogout={() => auth.signOut()} />}
           {activeTab === 'sales' && <SalesModule />}

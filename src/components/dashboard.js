@@ -1,90 +1,125 @@
-import React from 'react';
-import { auth } from '../firebase';
+import React, { useState, useEffect } from 'react';
+import { auth, db } from '../firebase';
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 
 const Dashboard = ({ userData, setActiveTab, onLogout }) => {
-  // Demo Data (Inshallah next step mein hum ise live Firestore se connect karenge)
-  const reports = [
-    { label: 'Daily Sale', value: 'Rs. 0', color: '#10b981' },
-    { label: 'Daily Purchase', value: 'Rs. 0', color: '#ef4444' },
-    { label: 'Daily Profit', value: 'Rs. 0', color: '#f59e0b' },
-    { label: 'Stock Value', value: 'Rs. 0', color: '#3b82f6' }
+  const [stats, setStats] = useState({
+    dailySale: 0,
+    dailyPurchase: 0,
+    dailyProfit: 0,
+    activeStaff: 0
+  });
+
+  useEffect(() => {
+    // 1. Aaj ki date range set karna
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    // 2. Real-time Sales & Profit Calculation
+    const salesQuery = query(collection(db, "sales_records")); // Aap yahan date filter add kar sakte hain
+    const unsubscribeSales = onSnapshot(salesQuery, (snapshot) => {
+      let totalS = 0;
+      let totalP = 0;
+      
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        totalS += data.total || 0;
+        
+        // Profit calculation: (Retail - Purchase) * Qty
+        data.items?.forEach(item => {
+          const profitPerUnit = (item.retailPrice || 0) - (item.purchasePrice || 0);
+          totalP += (profitPerUnit * (item.qty || 1));
+        });
+      });
+
+      setStats(prev => ({ ...prev, dailySale: totalS, dailyProfit: totalP }));
+    });
+
+    // 3. Active Staff Count
+    const staffQuery = query(collection(db, "staff_members"), where("status", "==", "Present"));
+    const unsubscribeStaff = onSnapshot(staffQuery, (snapshot) => {
+      setStats(prev => ({ ...prev, activeStaff: snapshot.size }));
+    });
+
+    return () => {
+      unsubscribeSales();
+      unsubscribeStaff();
+    };
+  }, []);
+
+  const reportCards = [
+    { label: 'Daily Sale', value: `Rs. ${stats.dailySale}`, color: '#10b981' },
+    { label: 'Daily Profit', value: `Rs. ${stats.dailyProfit}`, color: '#f59e0b' },
+    { label: 'Active Staff', value: stats.activeStaff, color: '#3b82f6' },
+    { label: 'Total Purchase', value: `Rs. ${stats.dailyPurchase}`, color: '#ef4444' }
   ];
 
   return (
-    <div className="dashboard-wrapper" style={{ padding: '15px', textAlign: 'left' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
+    <div className="dashboard-wrapper" style={{ padding: '15px' }}>
+      <header style={headerStyle}>
         <div>
-          <p style={{ color: '#888', fontSize: '12px', margin: 0 }}>System Active</p>
+          <p style={{ color: '#888', fontSize: '12px', margin: 0 }}>HITL-FLOWTRACK</p>
           <h2 style={{ fontSize: '18px', margin: 0, color: '#fff' }}>
             {auth.currentUser?.email.split('@')[0].toUpperCase()}
           </h2>
         </div>
-        <div className="role-tag" style={{ background: '#f59e0b', color: '#000', padding: '4px 12px', borderRadius: '50px', fontSize: '10px', fontWeight: 'bold' }}>
-          {userData?.role || 'USER'}
-        </div>
+        <div style={roleBadgeStyle}>{userData?.role || 'USER'}</div>
       </header>
 
-      {/* Reports Grid - Condition 3 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '25px' }}>
-        {reports.map((report, index) => (
-          <div key={index} style={{ background: '#111', padding: '15px', borderRadius: '18px', border: '1px solid #222' }}>
-            <span style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase' }}>{report.label}</span>
-            <h3 style={{ margin: '5px 0 0 0', fontSize: '16px', color: report.color }}>{report.value}</h3>
+      {/* Real-time Cards */}
+      <div style={gridStyle}>
+        {reportCards.map((card, i) => (
+          <div key={i} style={cardStyle}>
+            <span style={{ fontSize: '10px', color: '#666' }}>{card.label}</span>
+            <h3 style={{ margin: '5px 0 0', fontSize: '16px', color: card.color }}>{card.value}</h3>
           </div>
         ))}
       </div>
 
-      <h4 style={{ fontSize: '12px', color: '#f59e0b', marginBottom: '15px', letterSpacing: '1px' }}>QUICK OPERATIONS</h4>
+      <h4 style={sectionTitleStyle}>OPERATIONS CONTROL</h4>
 
-      {/* Module Links - Beautiful List Style */}
       <div className="module-list">
-        <div className="module-item" onClick={() => setActiveTab('sales')} style={itemStyle}>
-          <div style={iconBoxStyle}>🛒</div>
+        <div onClick={() => setActiveTab('sales')} style={itemStyle}>
+          <div style={iconBox}>🛒</div>
           <div style={{ flex: 1 }}>
             <strong style={{ fontSize: '14px' }}>Sales Terminal</strong>
-            <p style={{ fontSize: '10px', color: '#666', margin: 0 }}>Create new invoice/order</p>
+            <p style={{ fontSize: '10px', color: '#666', margin: 0 }}>Create orders & invoices</p>
           </div>
-          <span style={{ color: '#333' }}>→</span>
+          <span>→</span>
         </div>
 
-        <div className="module-item" onClick={() => setActiveTab('inventory')} style={itemStyle}>
-          <div style={iconBoxStyle}>📦</div>
+        <div onClick={() => setActiveTab('inventory')} style={itemStyle}>
+          <div style={iconBox}>📦</div>
           <div style={{ flex: 1 }}>
             <strong style={{ fontSize: '14px' }}>Inventory Hub</strong>
-            <p style={{ fontSize: '10px', color: '#666', margin: 0 }}>Manage stock & purchase price</p>
+            <p style={{ fontSize: '10px', color: '#666', margin: 0 }}>Stock levels & pricing</p>
           </div>
-          <span style={{ color: '#333' }}>→</span>
+          <span>→</span>
         </div>
 
-        <div className="module-item" onClick={() => setActiveTab('staff')} style={itemStyle}>
-          <div style={iconBoxStyle}>👥</div>
+        <div onClick={() => setActiveTab('staff')} style={itemStyle}>
+          <div style={iconBox}>👥</div>
           <div style={{ flex: 1 }}>
             <strong style={{ fontSize: '14px' }}>Staff & Attendance</strong>
-            <p style={{ fontSize: '10px', color: '#666', margin: 0 }}>Duty management & tracking</p>
+            <p style={{ fontSize: '10px', color: '#666', margin: 0 }}>Track duty & shifts</p>
           </div>
-          <span style={{ color: '#333' }}>→</span>
+          <span>→</span>
         </div>
       </div>
 
-      <button 
-        onClick={onLogout}
-        style={{ width: '100%', marginTop: '30px', padding: '15px', background: 'transparent', border: '1px solid #333', borderRadius: '12px', color: '#ef4444', fontSize: '12px', fontWeight: 'bold' }}
-      >
-        SECURE LOGOUT
-      </button>
+      <button onClick={onLogout} style={logoutButtonStyle}>SECURE LOGOUT</button>
     </div>
   );
 };
 
-// Inline Styles for Dashboard Items
-const itemStyle = {
-  background: '#111', display: 'flex', alignItems: 'center', padding: '15px', 
-  borderRadius: '18px', marginBottom: '12px', border: '1px solid #222', cursor: 'pointer'
-};
-
-const iconBoxStyle = {
-  width: '45px', height: '45px', background: '#1a1a1a', borderRadius: '12px', 
-  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', marginRight: '15px'
-};
+// --- Styles ---
+const headerStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' };
+const roleBadgeStyle = { background: '#f59e0b', color: '#000', padding: '4px 12px', borderRadius: '50px', fontSize: '10px', fontWeight: 'bold' };
+const gridStyle = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '25px' };
+const cardStyle = { background: '#111', padding: '15px', borderRadius: '18px', border: '1px solid #222' };
+const sectionTitleStyle = { fontSize: '11px', color: '#f59e0b', marginBottom: '15px', letterSpacing: '1px' };
+const itemStyle = { background: '#111', display: 'flex', alignItems: 'center', padding: '15px', borderRadius: '18px', marginBottom: '12px', border: '1px solid #222', cursor: 'pointer' };
+const iconBox = { width: '40px', height: '40px', background: '#1a1a1a', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', marginRight: '15px' };
+const logoutButtonStyle = { width: '100%', marginTop: '20px', padding: '15px', background: 'transparent', border: '1px solid #333', borderRadius: '12px', color: '#ef4444', fontSize: '12px' };
 
 export default Dashboard;

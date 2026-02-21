@@ -1,127 +1,75 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, getDocs, updateDoc, doc, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
 
 const SalesModule = () => {
-  const [inventory, setInventory] = useState([]);
+  const [items, setItems] = useState([]);
   const [cart, setCart] = useState([]);
-  const [showReceipt, setShowReceipt] = useState(false);
-  const [lastOrder, setLastOrder] = useState(null);
+  const [total, setTotal] = useState(0);
 
-  useEffect(() => { fetchInventory(); }, []);
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "inventory_records"), (snap) => {
+      setItems(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsub();
+  }, []);
 
-  const fetchInventory = async () => {
-    const querySnapshot = await getDocs(collection(db, "inventory_records"));
-    setInventory(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-  };
-
-  const addToCart = (item) => {
-    if (item.stock <= 0) return alert("Stock khatam hai!");
-    const existing = cart.find(c => c.id === item.id);
+  const addToCart = (product) => {
+    if (product.stock <= 0) return alert("Stock Out!");
+    const existing = cart.find(c => c.id === product.id);
     if (existing) {
-      setCart(cart.map(c => c.id === item.id ? { ...c, qty: c.qty + 1 } : c));
+      setCart(cart.map(c => c.id === product.id ? { ...c, qty: c.qty + 1 } : c));
     } else {
-      setCart([...cart, { ...item, qty: 1 }]);
+      setCart([...cart, { ...product, qty: 1 }]);
     }
+    setTotal(total + product.retailPrice);
   };
 
-  const calculateTotal = () => cart.reduce((sum, item) => sum + (item.retailPrice * item.qty), 0);
-
-  const handleCheckout = async () => {
-    if (cart.length === 0) return alert("Cart khali hai!");
+  const checkout = async () => {
+    if (cart.length === 0) return;
     try {
-      const orderData = { items: cart, total: calculateTotal(), timestamp: serverTimestamp() };
-      const docRef = await addDoc(collection(db, "sales_records"), orderData);
+      await addDoc(collection(db, "sales_records"), {
+        items: cart,
+        total: total,
+        timestamp: serverTimestamp()
+      });
+      
+      // Update Stock
       for (const item of cart) {
         const itemRef = doc(db, "inventory_records", item.id);
-        await updateDoc(itemRef, { stock: Number(item.stock) - item.qty });
+        await updateDoc(itemRef, { stock: item.stock - item.qty });
       }
-      setLastOrder({ ...orderData, id: docRef.id });
-      setShowReceipt(true);
+      
+      alert("Sale Successful!");
       setCart([]);
-      fetchInventory();
-    } catch (err) { alert("Error: " + err.message); }
+      setTotal(0);
+    } catch (e) { alert(e.message); }
   };
 
-  if (showReceipt) {
-    return (
-      <div style={receiptOverlay}>
-        <div style={receiptBox}>
-          <h2 style={{ color: '#f59e0b' }}>HITL-FLOWTRACK</h2>
-          <div style={{ textAlign: 'left', margin: '15px 0', fontSize: '14px' }}>
-            {lastOrder.items.map(item => (
-              <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>{item.name} x{item.qty}</span>
-                <span>Rs.{item.retailPrice * item.qty}</span>
-              </div>
-            ))}
-          </div>
-          <h3 style={{ borderTop: '1px solid #333', paddingTop: '10px' }}>Total: Rs.{lastOrder.total}</h3>
-          <button onClick={() => { window.print(); setShowReceipt(false); }} style={printBtn}>Print & Close</button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div style={containerStyle}>
-      <h2 style={{ color: '#f59e0b', textAlign: 'center', fontSize: '1.2rem' }}>🛒 SALES TERMINAL</h2>
-      
-      {/* Responsive Layout Wrapper */}
-      <div className="sales-layout" style={layoutWrapper}>
-        
-        {/* Inventory Section */}
-        <div style={inventorySection}>
-          <div style={mobileGrid}>
-            {inventory.map(item => (
-              <div key={item.id} onClick={() => addToCart(item)} style={itemCard}>
-                <div style={{fontSize: '20px'}}>📦</div>
-                <div style={{fontWeight: 'bold', fontSize: '13px'}}>{item.name}</div>
-                <div style={{color: '#f59e0b', fontSize: '12px'}}>Rs.{item.retailPrice}</div>
-              </div>
-            ))}
+    <div>
+      <h3>🛒 SALES TERMINAL</h3>
+      <div className="module-list" style={{ maxHeight: '300px', overflowY: 'auto', marginBottom: '20px' }}>
+        {items.map(item => (
+          <div key={item.id} className="module-item" onClick={() => addToCart(item)}>
+            <div className="icon-box">📦</div>
+            <div style={{ flex: 1 }}>
+              <strong>{item.name}</strong>
+              <p>Price: Rs.{item.retailPrice} | Stock: {item.stock}</p>
+            </div>
           </div>
-        </div>
-
-        {/* Floating/Bottom Cart for Mobile */}
-        <div style={cartSection}>
-          <h4 style={{margin: '0 0 10px 0', borderBottom: '1px solid #333'}}>Current Order ({cart.length})</h4>
-          <div style={{ maxHeight: '150px', overflowY: 'auto', marginBottom: '10px' }}>
-            {cart.map(item => (
-              <div key={item.id} style={cartItem}>
-                <span>{item.name} x{item.qty}</span>
-                <span>Rs.{item.retailPrice * item.qty}</span>
-              </div>
-            ))}
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{fontSize: '18px', fontWeight: 'bold'}}>Total: Rs.{calculateTotal()}</span>
-            <button onClick={handleCheckout} style={checkoutBtn}>CHECKOUT</button>
-          </div>
-        </div>
-
+        ))}
       </div>
+
+      {cart.length > 0 && (
+        <div style={{ background: '#111', padding: '15px', borderRadius: '15px', border: '1px solid #f59e0b' }}>
+          <h4>Current Bill: Rs. {total}</h4>
+          {cart.map(c => <p key={c.id} style={{fontSize: '12px'}}>{c.name} x {c.qty}</p>)}
+          <button onClick={checkout} style={{ width: '100%', padding: '12px', background: '#f59e0b', color: '#000', marginTop: '10px', borderRadius: '10px' }}>COMPLETE SALE</button>
+        </div>
+      )}
     </div>
   );
 };
-
-// --- Mobile-First CSS (In JS) ---
-const containerStyle = { padding: '10px', background: '#000', minHeight: '100vh', color: '#fff' };
-const layoutWrapper = { display: 'flex', flexDirection: window.innerWidth < 768 ? 'column' : 'row', gap: '15px' };
-const inventorySection = { flex: 1, marginBottom: window.innerWidth < 768 ? '180px' : '0' };
-const mobileGrid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '10px' };
-const itemCard = { background: '#111', padding: '10px', borderRadius: '12px', border: '1px solid #333', textAlign: 'center' };
-const cartSection = { 
-  background: '#1a1a1a', padding: '15px', borderRadius: '20px 20px 0 0', borderTop: '2px solid #f59e0b',
-  position: window.innerWidth < 768 ? 'fixed' : 'sticky', 
-  bottom: 0, left: 0, right: 0, zIndex: 100,
-  width: window.innerWidth < 768 ? '100%' : '350px',
-  boxSizing: 'border-box'
-};
-const cartItem = { display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '5px' };
-const checkoutBtn = { background: '#f59e0b', color: '#000', border: 'none', padding: '12px 20px', borderRadius: '10px', fontWeight: 'bold' };
-const receiptOverlay = { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000 };
-const receiptBox = { background: '#111', padding: '20px', borderRadius: '15px', width: '90%', maxWidth: '300px', textAlign: 'center', border: '1px solid #f59e0b' };
-const printBtn = { background: '#f59e0b', border: 'none', padding: '10px', borderRadius: '5px', width: '100%', marginTop: '15px', fontWeight: 'bold' };
 
 export default SalesModule;

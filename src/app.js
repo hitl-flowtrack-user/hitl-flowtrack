@@ -1,16 +1,21 @@
 import React, { useState } from 'react';
 import './app.css';
 
-// Exact paths matching your GitHub Image #4
-import Dashboard from './components/dashboard';
-import AddItem from './components/additem';
-import InventoryView from './components/inventoryview';
-import SalesModule from './components/salesmodule'; 
-import Attendance from './components/attendance';
-import Navbar from './components/navbar';
+// Tamam imports ab lowercase hain jaisa aapne GitHub par kiya
+import dashboard from './components/dashboard';
+import additem from './components/additem';
+import inventoryview from './components/inventoryview';
+import salesmodule from './components/salesmodule'; // 's' and 'm' now lowercase
+import attendance from './components/attendance';
+import navbar from './components/navbar';
 
-// Note: Agar dayclosing aur flowView files abhi nahi banayi, 
-// to niche humne unhe placeholder se handle kiya hai taake error na aye.
+// React components ka pehla letter hamesha Capital hona chahiye (Code mein)
+const Dashboard = dashboard;
+const AddItem = additem;
+const InventoryView = inventoryview;
+const SalesModule = salesmodule;
+const Attendance = attendance;
+const Navbar = navbar;
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -23,42 +28,40 @@ function App() {
 
   return (
     <div className="app-container" style={{ background: '#000', minHeight: '100vh' }}>
-      {/* Hum Navbar ko sirf tab dikhayenge jab screen dashboard na ho, ya dashboard ke andar hi rakhenge */}
-      
       <main className="content-area">
         {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
         {activeTab === 'additem' && (
           <AddItem 
             existingItem={editData} 
-            onComplete={() => { setEditData(null); setActiveTab('inventory'); }} 
+            onComplete={() => { setEditData(null); setActiveTab('inventoryview'); }} 
           />
         )}
-        {activeTab === 'inventory' && <InventoryView onEdit={handleEdit} />}
-        {activeTab === 'sales' && <SalesModule />}
+        {activeTab === 'inventoryview' && <InventoryView onEdit={handleEdit} />}
+        {activeTab === 'salesmodule' && <SalesModule />}
         {activeTab === 'attendance' && <Attendance />}
         
-        {/* Temporarily handling missing files to prevent Vercel error */}
-        {activeTab === 'closing' && <div style={{color:'#fff', padding:'20px'}}>Day Closing Module Coming Soon...</div>}
-        {activeTab === 'flow' && <div style={{color:'#fff', padding:'20px'}}>Cash Flow Module Coming Soon...</div>}
+        {/* Missing files placeholders to prevent build crash */}
+        {activeTab === 'dayclosing' && <div style={{color:'#fff', padding:'20px'}}>Day Closing Coming Soon...</div>}
+        {activeTab === 'flowview' && <div style={{color:'#fff', padding:'20px'}}>Cash Flow Coming Soon...</div>}
       </main>
 
-      {/* Mobile Bottom Navbar (Optional but good for UX) */}
+      {/* Floating Home Button for Mobile View */}
       {activeTab !== 'dashboard' && (
         <button 
           onClick={() => setActiveTab('dashboard')}
-          style={backButtonStyle}
+          style={homeButtonStyle}
         >
-          Back to Dashboard
+          🏠 Home
         </button>
       )}
     </div>
   );
 }
 
-const backButtonStyle = {
+const homeButtonStyle = {
   position: 'fixed', bottom: '20px', right: '20px', background: '#f59e0b',
-  color: '#000', border: 'none', padding: '10px 20px', borderRadius: '50px',
-  fontWeight: 'bold', boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)', cursor: 'pointer'
+  color: '#000', border: 'none', padding: '12px 20px', borderRadius: '50px',
+  fontWeight: 'bold', boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)', cursor: 'pointer', zIndex: 1000
 };
 
 export default App;

@@ -1,156 +1,105 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, getDocs, updateDoc, doc, serverTimestamp, query, where } from "firebase/firestore";
+import { collection, addDoc, getDocs, updateDoc, doc, serverTimestamp } from "firebase/firestore";
 
 const Attendance = () => {
   const [staff, setStaff] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [newStaff, setNewStaff] = useState({
+    name: '', cnic: '', designation: '', department: '', 
+    defaultIn: '09:00', defaultOut: '18:00'
+  });
 
-  // Default Duty Timings (Example: 9:00 AM to 6:00 PM)
-  const defaultIn = "09:00";
-  const defaultOut = "18:00";
-  const defaultDuration = "9 Hours";
-
-  useEffect(() => {
-    fetchStaff();
-  }, []);
+  useEffect(() => { fetchStaff(); }, []);
 
   const fetchStaff = async () => {
-    try {
-      const querySnapshot = await getDocs(collection(db, "staff_members"));
-      const staffList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setStaff(staffList);
-      setLoading(false);
-    } catch (err) {
-      console.error("Error fetching staff:", err);
-      setLoading(false);
-    }
+    const querySnapshot = await getDocs(collection(db, "staff_members"));
+    setStaff(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
   };
 
-  const handleCheckIn = async (staffId) => {
-    const now = new Date();
-    const timeIn = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
-    
+  const handleAddStaff = async (e) => {
+    e.preventDefault();
     try {
-      const staffRef = doc(db, "staff_members", staffId);
-      await updateDoc(staffRef, { 
-        actualTimeIn: timeIn,
-        status: 'Present',
-        lastUpdated: serverTimestamp()
+      await addDoc(collection(db, "staff_members"), {
+        ...newStaff,
+        status: 'Offline',
+        actualTimeIn: '',
+        actualTimeOut: '',
+        actualDuration: ''
       });
-      alert("Check-in Successful!");
+      alert("Staff Member Added!");
+      setShowForm(false);
       fetchStaff();
     } catch (err) { alert(err.message); }
   };
 
-  const handleCheckOut = async (staffMember) => {
-    const now = new Date();
-    const timeOut = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
-    
-    // Duration Calculation
-    const [inH, inM] = staffMember.actualTimeIn.split(':');
-    const [outH, outM] = [now.getHours(), now.getMinutes()];
-    const diffHours = outH - parseInt(inH);
-    const diffMins = outM - parseInt(inM);
-    const duration = `${diffHours}h ${Math.abs(diffMins)}m`;
+  const handleCheckIn = async (id) => {
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    await updateDoc(doc(db, "staff_members", id), { status: 'Present', actualTimeIn: time });
+    fetchStaff();
+  };
 
-    try {
-      const staffRef = doc(db, "staff_members", staffMember.id);
-      await updateDoc(staffRef, { 
-        actualTimeOut: timeOut,
-        actualDuration: duration,
-        status: 'Checked-Out',
-        lastUpdated: serverTimestamp()
-      });
-      alert("Check-out Successful!");
-      fetchStaff();
-    } catch (err) { alert(err.message); }
+  const handleCheckOut = async (id) => {
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    await updateDoc(doc(db, "staff_members", id), { status: 'Checked-Out', actualTimeOut: time });
+    fetchStaff();
   };
 
   return (
-    <div style={{ padding: '10px', background: '#000', minHeight: '100vh', color: '#fff' }}>
-      <h2 style={{ color: '#f59e0b', textAlign: 'center' }}>👥 STAFF ATTENDANCE</h2>
-      
-      {loading ? <p>Loading Staff...</p> : (
-        <div style={listContainer}>
-          {staff.map((member) => (
-            <div key={member.id} style={staffCard}>
-              {/* Profile Header */}
-              <div style={cardHeader}>
-                <div style={avatar}>{member.name[0]}</div>
-                <div style={{ textAlign: 'left', flex: 1, marginLeft: '15px' }}>
-                  <h3 style={{ margin: 0, color: '#f59e0b', fontSize: '18px' }}>{member.name}</h3>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#888' }}>{member.designation} | {member.department}</p>
-                </div>
-                <div style={{ ...statusBadge, background: member.status === 'Present' ? '#10b981' : '#333' }}>
-                  {member.status || 'Offline'}
-                </div>
-              </div>
+    <div style={{ padding: '10px', color: '#fff' }}>
+      <h2 style={{ textAlign: 'center', color: '#f59e0b' }}>👥 STAFF & ATTENDANCE</h2>
 
-              {/* Data Grid */}
-              <div style={infoGrid}>
-                <div style={infoBox}>
-                  <span>🆔 CNIC</span>
-                  <strong>{member.cnic || 'N/A'}</strong>
-                </div>
-                <div style={infoBox}>
-                  <span>📅 Duty Schedule</span>
-                  <strong>{defaultIn} - {defaultOut} ({defaultDuration})</strong>
-                </div>
-              </div>
+      {/* Add Staff Button */}
+      <button onClick={() => setShowForm(!showForm)} style={addBtnStyle}>
+        {showForm ? '✖ Close Form' : '➕ Register New Staff'}
+      </button>
 
-              {/* Actual Timings Comparison */}
-              <div style={attendanceStats}>
-                <div style={statItem}>
-                  <span style={{color: '#888'}}>Actual In</span>
-                  <strong style={{color: '#10b981'}}>{member.actualTimeIn || '--:--'}</strong>
-                </div>
-                <div style={statItem}>
-                  <span style={{color: '#888'}}>Actual Out</span>
-                  <strong style={{color: '#ef4444'}}>{member.actualTimeOut || '--:--'}</strong>
-                </div>
-                <div style={statItem}>
-                  <span style={{color: '#888'}}>Work Duration</span>
-                  <strong style={{color: '#f59e0b'}}>{member.actualDuration || '0h 0m'}</strong>
-                </div>
-              </div>
+      {showForm && (
+        <form onSubmit={handleAddStaff} style={formStyle}>
+          <input placeholder="Full Name" onChange={e => setNewStaff({...newStaff, name: e.target.value})} required />
+          <input placeholder="CNIC Number" onChange={e => setNewStaff({...newStaff, cnic: e.target.value})} required />
+          <input placeholder="Designation" onChange={e => setNewStaff({...newStaff, designation: e.target.value})} required />
+          <input placeholder="Department" onChange={e => setNewStaff({...newStaff, department: e.target.value})} required />
+          <button type="submit" style={submitBtn}>Save Staff Member</button>
+        </form>
+      )}
 
-              {/* Actions */}
-              <div style={actionRow}>
-                <button 
-                  disabled={member.status === 'Present' || member.status === 'Checked-Out'}
-                  onClick={() => handleCheckIn(member.id)} 
-                  style={{ ...actionBtn, background: '#10b981' }}
-                >
-                  Check In
-                </button>
-                <button 
-                  disabled={member.status !== 'Present'}
-                  onClick={() => handleCheckOut(member)} 
-                  style={{ ...actionBtn, background: '#ef4444' }}
-                >
-                  Check Out
-                </button>
+      {/* Staff List */}
+      <div style={{ marginTop: '20px' }}>
+        {staff.map(member => (
+          <div key={member.id} style={cardStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div>
+                <h4 style={{ color: '#f59e0b' }}>{member.name}</h4>
+                <p style={{ fontSize: '11px', color: '#888' }}>{member.designation} ({member.cnic})</p>
+              </div>
+              <div style={{ background: member.status === 'Present' ? '#10b981' : '#333', padding: '5px 10px', borderRadius: '5px', fontSize: '10px' }}>
+                {member.status}
               </div>
             </div>
-          ))}
-        </div>
-      )}
+
+            <div style={timeRow}>
+              <div>In: {member.actualTimeIn || '--'}</div>
+              <div>Out: {member.actualTimeOut || '--'}</div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
+              <button disabled={member.status === 'Present'} onClick={() => handleCheckIn(member.id)} style={{...actionBtn, background: '#10b981'}}>Check In</button>
+              <button disabled={member.status !== 'Present'} onClick={() => handleCheckOut(member.id)} style={{...actionBtn, background: '#ef4444'}}>Check Out</button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
 
-// --- Mobile Friendly Styles ---
-const listContainer = { display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '10px' };
-const staffCard = { background: '#111', borderRadius: '20px', padding: '20px', border: '1px solid #333' };
-const cardHeader = { display: 'flex', alignItems: 'center', marginBottom: '15px' };
-const avatar = { width: '50px', height: '50px', background: '#222', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#f59e0b', fontSize: '20px', border: '1px solid #f59e0b' };
-const statusBadge = { padding: '5px 12px', borderRadius: '20px', fontSize: '10px', fontWeight: 'bold' };
-const infoGrid = { display: 'grid', gridTemplateColumns: '1fr', gap: '10px', background: '#000', padding: '12px', borderRadius: '12px', marginBottom: '15px' };
-const infoBox = { display: 'flex', justifyContent: 'space-between', fontSize: '12px' };
-const attendanceStats = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', textAlign: 'center', marginBottom: '15px', borderTop: '1px solid #222', paddingTop: '15px' };
-const statItem = { display: 'flex', flexDirection: 'column', fontSize: '11px' };
-const actionRow = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' };
-const actionBtn = { border: 'none', padding: '12px', borderRadius: '10px', color: '#fff', fontWeight: 'bold', cursor: 'pointer', opacity: '1' };
+// --- Styles ---
+const addBtnStyle = { width: '100%', padding: '12px', background: '#222', color: '#f59e0b', border: '1px dashed #f59e0b', borderRadius: '10px', fontWeight: 'bold' };
+const formStyle = { background: '#111', padding: '15px', borderRadius: '15px', marginTop: '10px', border: '1px solid #333' };
+const submitBtn = { width: '100%', padding: '12px', background: '#f59e0b', border: 'none', borderRadius: '10px', fontWeight: 'bold', marginTop: '10px' };
+const cardStyle = { background: '#111', padding: '15px', borderRadius: '15px', marginBottom: '10px', border: '1px solid #333' };
+const timeRow = { display: 'flex', justifyContent: 'space-around', fontSize: '12px', marginTop: '10px', color: '#aaa' };
+const actionBtn = { padding: '10px', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 'bold' };
 
 export default Attendance;

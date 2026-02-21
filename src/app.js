@@ -4,7 +4,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import './app.css';
 
-// Lazy loading components taake shuru mein load kam ho
+// Lazy loading with immediate fallback
 const Login = lazy(() => import('./components/login'));
 const Dashboard = lazy(() => import('./components/dashboard'));
 const SalesModule = lazy(() => import('./components/salesmodule'));
@@ -14,51 +14,44 @@ const PurchaseModule = lazy(() => import('./components/purchase'));
 
 function App() {
   const [user, setUser] = useState(null);
-  const [userData, setUserData] = useState(() => {
-    const saved = localStorage.getItem('user_role');
-    return saved ? { role: saved } : null;
-  });
+  const [userData, setUserData] = useState({ role: 'user' });
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
-        // Agar role pehle se nahi hai to hi fetch karein
-        if (!userData) {
+        try {
+          // Role fetch karein par software ko rokain nahi
           const userDoc = await getDoc(doc(db, "authorized_users", currentUser.uid));
-          const data = userDoc.exists() ? userDoc.data() : { role: 'user' };
-          setUserData(data);
-          localStorage.setItem('user_role', data.role);
+          if (userDoc.exists()) {
+            setUserData(userDoc.data());
+          }
+        } catch (e) {
+          console.log("Role fetch error, using default.");
         }
       } else {
         setUser(null);
-        setUserData(null);
-        localStorage.removeItem('user_role');
       }
-      setLoading(false);
+      setAuthLoading(false);
     });
     return () => unsubscribe();
-  }, [userData]);
+  }, []);
 
-  if (loading) return (
+  if (authLoading) return (
     <div className="fast-loader">
       <div className="spinner"></div>
-      <h3 style={{color:'#f59e0b', marginTop:'20px'}}>HITL-FLOWTRACK</h3>
+      <h3 style={{color:'#f59e0b', marginTop:'20px'}}>ORDERFLOW LOADING...</h3>
     </div>
   );
 
-  if (!user) return (
-    <Suspense fallback={<div>Loading Login...</div>}>
-      <Login />
-    </Suspense>
-  );
+  if (!user) return <Suspense fallback={null}><Login /></Suspense>;
 
   return (
     <div className="app-main">
-      <Suspense fallback={<div className="tab-loader">Opening {activeTab}...</div>}>
-        <main className="screen-container">
+      <Suspense fallback={<div className="tab-loader">Loading Page...</div>}>
+        <main className="screen-container" style={{ paddingBottom: '90px' }}>
           {activeTab === 'dashboard' && <Dashboard userData={userData} setActiveTab={setActiveTab} onLogout={() => auth.signOut()} />}
           {activeTab === 'sales' && <SalesModule />}
           {activeTab === 'inventory' && <InventoryView role={userData?.role} />}

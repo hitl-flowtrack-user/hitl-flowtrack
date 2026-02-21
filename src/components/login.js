@@ -14,22 +14,19 @@ const Login = ({ onLoginSuccess }) => {
     setError('');
     
     try {
-      // Email se extra spaces khatam karke login ki koshish
+      // Email aur Password trim karke login
       await signInWithEmailAndPassword(auth, email.trim(), password);
       onLoginSuccess(); 
     } catch (err) {
-      console.log("Full Firebase Error Object:", err);
-      console.error("Error Code:", err.code);
-
-      // Simple Urdu/Hindi Errors
-      if (err.code === 'auth/invalid-api-key' || err.code.includes('api-key-not-valid')) {
-        setError("Firebase API Key ka masla hai. Apni firebase.js file check karen.");
-      } else if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+      console.error("Firebase Error Object:", err);
+      
+      // Agar API key invalid keh raha hai to iska matlab firebase.js ko restart chahiye
+      if (err.message.includes('API key')) {
+        setError("Firebase Config Error: API Key match nahi ho rahi. Console check karein.");
+      } else if (err.code === 'auth/invalid-credential') {
         setError("Email ya Password ghalat hai!");
-      } else if (err.code === 'auth/network-request-failed') {
-        setError("Internet nahi chal raha ya Firebase blocked hai.");
       } else {
-        setError(`Masla: ${err.code}`); // Is se humein exact code mil jaye ga
+        setError(`Error: ${err.code || err.message}`);
       }
     }
     setLoading(false);
@@ -39,127 +36,34 @@ const Login = ({ onLoginSuccess }) => {
     <div style={containerStyle}>
       <div style={loginCardStyle}>
         <div style={logoIconStyle}>🔑</div>
-        
-        <h2 style={{ color: '#f59e0b', margin: '0 0 5px 0' }}>HITL-FLOWTRACK</h2>
-        <p style={{ color: '#666', fontSize: '12px', marginBottom: '25px' }}>Authorized Access Only</p>
+        <h2 style={{ color: '#f59e0b' }}>ELITE VAULT</h2>
+        <p style={{ color: '#666', fontSize: '12px', marginBottom: '20px' }}>Project: elite-vault-93de5</p>
 
-        <form onSubmit={handleLogin} style={{ width: '100%' }}>
-          <div style={inputGroup}>
-            <label style={labelStyle}>ADMIN EMAIL</label>
-            <input 
-              type="email" 
-              style={inputField} 
-              placeholder="admin@flowtrack.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required 
-            />
-          </div>
+        <form onSubmit={handleLogin}>
+          <input 
+            type="email" style={inputField} placeholder="Email"
+            value={email} onChange={(e) => setEmail(e.target.value)} required 
+          />
+          <input 
+            type="password" style={{...inputField, marginTop: '15px'}} placeholder="Password"
+            value={password} onChange={(e) => setPassword(e.target.value)} required 
+          />
 
-          <div style={inputGroup}>
-            <label style={labelStyle}>PASSWORD</label>
-            <input 
-              type="password" 
-              style={inputField} 
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required 
-            />
-          </div>
+          {error && <p style={{ color: '#ef4444', fontSize: '12px', marginTop: '10px' }}>{error}</p>}
 
-          {error && (
-            <div style={{ color: '#ef4444', fontSize: '13px', marginTop: '10px', background: 'rgba(239, 68, 68, 0.1)', padding: '10px', borderRadius: '8px' }}>
-              ⚠️ {error}
-            </div>
-          )}
-
-          <button 
-            type="submit" 
-            disabled={loading}
-            style={{...loginBtnStyle, opacity: loading ? 0.7 : 1}}
-          >
-            {loading ? 'VERIFYING...' : 'LOGIN TO SYSTEM'}
+          <button type="submit" disabled={loading} style={loginBtnStyle}>
+            {loading ? 'WAIT...' : 'SECURE LOGIN'}
           </button>
         </form>
-
-        <p style={{ marginTop: '20px', fontSize: '10px', color: '#444' }}>
-          HITL-FlowTrack v4.0 | Secure POS
-        </p>
       </div>
     </div>
   );
 };
 
-// --- Styles (Mobile Friendly & Professional) ---
-const containerStyle = {
-  background: '#000',
-  height: '100vh',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '20px'
-};
-
-const loginCardStyle = {
-  background: '#111',
-  padding: '40px 25px',
-  borderRadius: '25px',
-  width: '100%',
-  maxWidth: '380px',
-  textAlign: 'center',
-  border: '1px solid #333',
-  boxShadow: '0 15px 35px rgba(0,0,0,0.8)'
-};
-
-const logoIconStyle = {
-  fontSize: '35px',
-  background: '#222',
-  width: '70px',
-  height: '70px',
-  lineHeight: '70px',
-  borderRadius: '50%',
-  margin: '0 auto 15px',
-  border: '2px solid #f59e0b'
-};
-
-const inputGroup = {
-  textAlign: 'left',
-  marginBottom: '18px'
-};
-
-const labelStyle = {
-  display: 'block',
-  fontSize: '11px',
-  color: '#f59e0b',
-  marginBottom: '6px',
-  fontWeight: 'bold',
-  letterSpacing: '1px'
-};
-
-const inputField = {
-  width: '100%',
-  padding: '14px',
-  borderRadius: '10px',
-  border: '1px solid #333',
-  background: '#000',
-  color: '#fff',
-  fontSize: '15px',
-  boxSizing: 'border-box',
-  outline: 'none'
-};
-
-const loginBtnStyle = {
-  width: '100%',
-  padding: '15px',
-  borderRadius: '10px',
-  border: 'none',
-  background: '#f59e0b',
-  color: '#000',
-  fontSize: '16px',
-  fontWeight: 'bold',
-  cursor: 'pointer',
-  marginTop: '10px'
-};
+const containerStyle = { background: '#000', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' };
+const loginCardStyle = { background: '#111', padding: '30px', borderRadius: '20px', width: '320px', textAlign: 'center', border: '1px solid #333' };
+const logoIconStyle = { fontSize: '30px', marginBottom: '10px' };
+const inputField = { width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #333', background: '#000', color: '#fff' };
+const loginBtnStyle = { width: '100%', padding: '12px', marginTop: '20px', background: '#f59e0b', border: 'none', borderRadius: '8px', fontWeight: 'bold' };
 
 export default Login;

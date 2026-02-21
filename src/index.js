@@ -1,7 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import './index.css';
-import App from './app'; // app.js bahar hai isliye path ./app hai
+import App from './app'; // 'app' lowercase matching your file name
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

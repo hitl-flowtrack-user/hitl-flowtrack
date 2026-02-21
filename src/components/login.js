@@ -1,29 +1,151 @@
 import React, { useState } from 'react';
-import { auth } from '../firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase'; 
+import { signInWithEmailAndPassword } from "firebase/auth";
 
-const Login = ({ setAuth }) => {
-  const [e, setE] = useState('');
-  const [p, setP] = useState('');
+const Login = ({ onLoginSuccess }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handle = async (event) => {
-    event.preventDefault();
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    
     try {
-      await signInWithEmailAndPassword(auth, e, p);
-      localStorage.setItem("flowtrack_session", "active");
-      setAuth(true);
-    } catch (err) { alert("Login Failed"); }
+      await signInWithEmailAndPassword(auth, email, password);
+      onLoginSuccess(); // Login hone par dashboard par le jayega
+    } catch (err) {
+      setError("Ghalat Email ya Password! Dubara koshish karen.");
+    }
+    setLoading(false);
   };
 
   return (
-    <div style={{ backgroundColor: '#000', height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-      <form onSubmit={handle} style={{ backgroundColor: '#111', padding: '40px', borderRadius: '20px' }}>
-        <h2 style={{ color: '#f59e0b' }}>LOGIN</h2>
-        <input placeholder="Email" style={{ display: 'block', marginBottom: '10px', padding: '10px' }} onChange={x => setE(x.target.value)} />
-        <input type="password" placeholder="Password" style={{ display: 'block', marginBottom: '10px', padding: '10px' }} onChange={x => setP(x.target.value)} />
-        <button type="submit" style={{ width: '100%', padding: '10px', backgroundColor: '#f59e0b' }}>ENTER</button>
-      </form>
+    <div style={containerStyle}>
+      <div style={loginCardStyle}>
+        {/* Logo or Icon */}
+        <div style={logoIconStyle}>🔑</div>
+        
+        <h2 style={{ color: '#f59e0b', marginBottom: '5px' }}>MAHAVIR TRADERS</h2>
+        <p style={{ color: '#666', fontSize: '12px', marginBottom: '25px' }}>Authorized Access Only</p>
+
+        <form onSubmit={handleLogin} style={{ width: '100%' }}>
+          <div style={inputGroup}>
+            <label style={labelStyle}>Email Address</label>
+            <input 
+              type="email" 
+              style={inputField} 
+              placeholder="admin@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required 
+            />
+          </div>
+
+          <div style={inputGroup}>
+            <label style={labelStyle}>Password</label>
+            <input 
+              type="password" 
+              style={inputField} 
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required 
+            />
+          </div>
+
+          {error && <p style={{ color: '#ef4444', fontSize: '13px', marginTop: '10px' }}>{error}</p>}
+
+          <button 
+            type="submit" 
+            disabled={loading}
+            style={loginBtnStyle}
+          >
+            {loading ? 'AUTHENTICATING...' : 'SECURE LOGIN'}
+          </button>
+        </form>
+
+        <div style={{ marginTop: '30px', fontSize: '10px', color: '#444' }}>
+          Secure POS System v4.0
+        </div>
+      </div>
     </div>
   );
 };
+
+// --- Styles (Mobile Optimized) ---
+const containerStyle = {
+  background: '#000',
+  height: '100vh',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '20px'
+};
+
+const loginCardStyle = {
+  background: '#111',
+  padding: '40px 30px',
+  borderRadius: '30px',
+  width: '100%',
+  maxWidth: '400px',
+  textAlign: 'center',
+  border: '1px solid #333',
+  boxShadow: '0 20px 40px rgba(0,0,0,0.6)'
+};
+
+const logoIconStyle = {
+  fontSize: '40px',
+  background: '#222',
+  width: '80px',
+  height: '80px',
+  lineHeight: '80px',
+  borderRadius: '50%',
+  margin: '0 auto 20px',
+  border: '2px solid #f59e0b'
+};
+
+const inputGroup = {
+  textAlign: 'left',
+  marginBottom: '20px'
+};
+
+const labelStyle = {
+  display: 'block',
+  fontSize: '12px',
+  color: '#f59e0b',
+  marginBottom: '8px',
+  marginLeft: '5px',
+  textTransform: 'uppercase',
+  fontWeight: 'bold'
+};
+
+const inputField = {
+  width: '100%',
+  padding: '15px',
+  borderRadius: '12px',
+  border: '1px solid #333',
+  background: '#000',
+  color: '#fff',
+  fontSize: '16px',
+  boxSizing: 'border-box',
+  outline: 'none'
+};
+
+const loginBtnStyle = {
+  width: '100%',
+  padding: '15px',
+  borderRadius: '12px',
+  border: 'none',
+  background: '#f59e0b',
+  color: '#000',
+  fontSize: '16px',
+  fontWeight: 'bold',
+  cursor: 'pointer',
+  marginTop: '10px',
+  transition: '0.3s'
+};
+
 export default Login;

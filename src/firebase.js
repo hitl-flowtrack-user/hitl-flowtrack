@@ -15,11 +15,7 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 
-// --- Ye line Offline Support enable karti hai ---
+// Enable Offline Persistence for Speed
 enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-        console.log("Multiple tabs open, persistence can only be enabled in one tab at a time.");
-    } else if (err.code === 'unimplemented') {
-        console.log("The current browser does not support all of the features needed to enable persistence");
-    }
+    console.log("Persistence Error: ", err.code);
 });

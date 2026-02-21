@@ -14,10 +14,20 @@ const Login = ({ onLoginSuccess }) => {
     setError('');
     
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      onLoginSuccess(); // Login hone par dashboard par le jayega
+      // Firebase sign in call
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+      onLoginSuccess(); 
     } catch (err) {
-      setError("Ghalat Email ya Password! Dubara koshish karen.");
+      console.error("Auth Error Code:", err.code); // Is se asal masla pata chalega
+      if (err.code === 'auth/user-not-found') {
+        setError("Bhai, ye email register nahi hai!");
+      } else if (err.code === 'auth/wrong-password') {
+        setError("Password ghalat hai, dubara check karen.");
+      } else if (err.code === 'auth/invalid-credential') {
+        setError("Email ya Password ghalat hai!");
+      } else {
+        setError("Login mein masla aya: " + err.message);
+      }
     }
     setLoading(false);
   };
@@ -25,9 +35,7 @@ const Login = ({ onLoginSuccess }) => {
   return (
     <div style={containerStyle}>
       <div style={loginCardStyle}>
-        {/* Logo or Icon */}
         <div style={logoIconStyle}>🔑</div>
-        
         <h2 style={{ color: '#f59e0b', marginBottom: '5px' }}>MAHAVIR TRADERS</h2>
         <p style={{ color: '#666', fontSize: '12px', marginBottom: '25px' }}>Authorized Access Only</p>
 
@@ -58,94 +66,22 @@ const Login = ({ onLoginSuccess }) => {
 
           {error && <p style={{ color: '#ef4444', fontSize: '13px', marginTop: '10px' }}>{error}</p>}
 
-          <button 
-            type="submit" 
-            disabled={loading}
-            style={loginBtnStyle}
-          >
-            {loading ? 'AUTHENTICATING...' : 'SECURE LOGIN'}
+          <button type="submit" disabled={loading} style={loginBtnStyle}>
+            {loading ? 'CHECKING...' : 'SECURE LOGIN'}
           </button>
         </form>
-
-        <div style={{ marginTop: '30px', fontSize: '10px', color: '#444' }}>
-          Secure POS System v4.0
-        </div>
       </div>
     </div>
   );
 };
 
-// --- Styles (Mobile Optimized) ---
-const containerStyle = {
-  background: '#000',
-  height: '100vh',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '20px'
-};
-
-const loginCardStyle = {
-  background: '#111',
-  padding: '40px 30px',
-  borderRadius: '30px',
-  width: '100%',
-  maxWidth: '400px',
-  textAlign: 'center',
-  border: '1px solid #333',
-  boxShadow: '0 20px 40px rgba(0,0,0,0.6)'
-};
-
-const logoIconStyle = {
-  fontSize: '40px',
-  background: '#222',
-  width: '80px',
-  height: '80px',
-  lineHeight: '80px',
-  borderRadius: '50%',
-  margin: '0 auto 20px',
-  border: '2px solid #f59e0b'
-};
-
-const inputGroup = {
-  textAlign: 'left',
-  marginBottom: '20px'
-};
-
-const labelStyle = {
-  display: 'block',
-  fontSize: '12px',
-  color: '#f59e0b',
-  marginBottom: '8px',
-  marginLeft: '5px',
-  textTransform: 'uppercase',
-  fontWeight: 'bold'
-};
-
-const inputField = {
-  width: '100%',
-  padding: '15px',
-  borderRadius: '12px',
-  border: '1px solid #333',
-  background: '#000',
-  color: '#fff',
-  fontSize: '16px',
-  boxSizing: 'border-box',
-  outline: 'none'
-};
-
-const loginBtnStyle = {
-  width: '100%',
-  padding: '15px',
-  borderRadius: '12px',
-  border: 'none',
-  background: '#f59e0b',
-  color: '#000',
-  fontSize: '16px',
-  fontWeight: 'bold',
-  cursor: 'pointer',
-  marginTop: '10px',
-  transition: '0.3s'
-};
+// --- Styles Same as before ---
+const containerStyle = { background: '#000', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' };
+const loginCardStyle = { background: '#111', padding: '40px 30px', borderRadius: '30px', width: '100%', maxWidth: '400px', textAlign: 'center', border: '1px solid #333' };
+const logoIconStyle = { fontSize: '40px', background: '#222', width: '80px', height: '80px', lineHeight: '80px', borderRadius: '50%', margin: '0 auto 20px', border: '2px solid #f59e0b' };
+const inputGroup = { textAlign: 'left', marginBottom: '20px' };
+const labelStyle = { display: 'block', fontSize: '12px', color: '#f59e0b', marginBottom: '8px', fontWeight: 'bold' };
+const inputField = { width: '100%', padding: '15px', borderRadius: '12px', border: '1px solid #333', background: '#000', color: '#fff', fontSize: '16px', boxSizing: 'border-box' };
+const loginBtnStyle = { width: '100%', padding: '15px', borderRadius: '12px', border: 'none', background: '#f59e0b', color: '#000', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' };
 
 export default Login;

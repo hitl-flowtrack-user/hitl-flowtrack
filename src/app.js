@@ -1,68 +1,76 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { auth, db } from './firebase'; 
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import './app.css';
 
-// Components (Hamesha Capital se start karen)
-import Login from './components/login';
-import Dashboard from './components/dashboard';
-import SalesModule from './components/salesmodule';
-import InventoryView from './components/inventoryview';
-import Attendance from './components/attendance';
+// Lazy loading components taake shuru mein load kam ho
+const Login = lazy(() => import('./components/login'));
+const Dashboard = lazy(() => import('./components/dashboard'));
+const SalesModule = lazy(() => import('./components/salesmodule'));
+const InventoryView = lazy(() => import('./components/inventoryview'));
+const Attendance = lazy(() => import('./components/attendance'));
+const PurchaseModule = lazy(() => import('./components/purchase'));
 
 function App() {
   const [user, setUser] = useState(null);
-  const [userData, setUserData] = useState(null);
+  const [userData, setUserData] = useState(() => {
+    const saved = localStorage.getItem('user_role');
+    return saved ? { role: saved } : null;
+  });
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
-        try {
-          // Authorized users check
+        setUser(currentUser);
+        // Agar role pehle se nahi hai to hi fetch karein
+        if (!userData) {
           const userDoc = await getDoc(doc(db, "authorized_users", currentUser.uid));
-          setUserData(userDoc.exists() ? userDoc.data() : { role: 'user' });
-          setUser(currentUser);
-        } catch (err) {
-          console.error("Firestore Error:", err);
-          setUserData({ role: 'user' });
-          setUser(currentUser);
+          const data = userDoc.exists() ? userDoc.data() : { role: 'user' };
+          setUserData(data);
+          localStorage.setItem('user_role', data.role);
         }
       } else {
         setUser(null);
         setUserData(null);
+        localStorage.removeItem('user_role');
       }
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [userData]);
 
   if (loading) return (
-    <div style={{background:'#000', height:'100vh', display:'flex', justifyContent:'center', alignItems:'center'}}>
-      <h3 style={{color:'#f59e0b', letterSpacing:'3px'}}>HITL-FLOWTRACK</h3>
+    <div className="fast-loader">
+      <div className="spinner"></div>
+      <h3 style={{color:'#f59e0b', marginTop:'20px'}}>HITL-FLOWTRACK</h3>
     </div>
   );
 
-  // Requirements 1 & 2: No login, no access
-  if (!user) return <Login />;
+  if (!user) return (
+    <Suspense fallback={<div>Loading Login...</div>}>
+      <Login />
+    </Suspense>
+  );
 
   return (
     <div className="app-main">
-      <main className="screen-container" style={{ paddingBottom: '80px' }}>
-        {activeTab === 'dashboard' && (
-          <Dashboard userData={userData} setActiveTab={setActiveTab} onLogout={() => auth.signOut()} />
-        )}
-        {activeTab === 'sales' && <SalesModule />}
-        {activeTab === 'inventory' && <InventoryView role={userData?.role} />}
-        {activeTab === 'staff' && <Attendance />}
-      </main>
+      <Suspense fallback={<div className="tab-loader">Opening {activeTab}...</div>}>
+        <main className="screen-container">
+          {activeTab === 'dashboard' && <Dashboard userData={userData} setActiveTab={setActiveTab} onLogout={() => auth.signOut()} />}
+          {activeTab === 'sales' && <SalesModule />}
+          {activeTab === 'inventory' && <InventoryView role={userData?.role} />}
+          {activeTab === 'staff' && <Attendance />}
+          {activeTab === 'purchase' && <PurchaseModule />}
+        </main>
+      </Suspense>
 
-      {/* Modern Bottom Navigation */}
       <nav className="bottom-nav">
         <button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'active' : ''}>📊</button>
         <button onClick={() => setActiveTab('sales')} className={activeTab === 'sales' ? 'active' : ''}>🛒</button>
+        <button onClick={() => setActiveTab('purchase')} className={activeTab === 'purchase' ? 'active' : ''}>🚚</button>
         <button onClick={() => setActiveTab('inventory')} className={activeTab === 'inventory' ? 'active' : ''}>📦</button>
         <button onClick={() => setActiveTab('staff')} className={activeTab === 'staff' ? 'active' : ''}>👥</button>
       </nav>

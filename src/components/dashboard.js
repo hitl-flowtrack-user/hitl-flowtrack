@@ -1,125 +1,111 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db } from '../firebase';
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, onSnapshot, where } from "firebase/firestore";
 
 const Dashboard = ({ userData, setActiveTab, onLogout }) => {
   const [stats, setStats] = useState({
-    dailySale: 0,
-    dailyPurchase: 0,
-    dailyProfit: 0,
-    activeStaff: 0
+    sale: 0,
+    purchase: 0,
+    profit: 0,
+    staff: 0
   });
 
   useEffect(() => {
-    // 1. Aaj ki date range set karna
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-
-    // 2. Real-time Sales & Profit Calculation
-    const salesQuery = query(collection(db, "sales_records")); // Aap yahan date filter add kar sakte hain
-    const unsubscribeSales = onSnapshot(salesQuery, (snapshot) => {
-      let totalS = 0;
-      let totalP = 0;
-      
+    // Reports calculation logic
+    const salesUnsub = onSnapshot(collection(db, "sales_records"), (snapshot) => {
+      let totalS = 0, totalP = 0;
       snapshot.forEach(doc => {
-        const data = doc.data();
-        totalS += data.total || 0;
-        
-        // Profit calculation: (Retail - Purchase) * Qty
-        data.items?.forEach(item => {
-          const profitPerUnit = (item.retailPrice || 0) - (item.purchasePrice || 0);
-          totalP += (profitPerUnit * (item.qty || 1));
+        const d = doc.data();
+        totalS += d.total || 0;
+        d.items?.forEach(item => {
+          totalP += ((item.retailPrice - (item.purchasePrice || 0)) * item.qty);
         });
       });
-
-      setStats(prev => ({ ...prev, dailySale: totalS, dailyProfit: totalP }));
+      setStats(prev => ({ ...prev, sale: totalS, profit: totalP }));
     });
 
-    // 3. Active Staff Count
-    const staffQuery = query(collection(db, "staff_members"), where("status", "==", "Present"));
-    const unsubscribeStaff = onSnapshot(staffQuery, (snapshot) => {
-      setStats(prev => ({ ...prev, activeStaff: snapshot.size }));
+    const purUnsub = onSnapshot(collection(db, "purchase_records"), (snapshot) => {
+      let totalPur = 0;
+      snapshot.forEach(doc => {
+        totalPur += (doc.data().purchasePrice * doc.data().quantity);
+      });
+      setStats(prev => ({ ...prev, purchase: totalPur }));
     });
 
-    return () => {
-      unsubscribeSales();
-      unsubscribeStaff();
-    };
+    const staffUnsub = onSnapshot(query(collection(db, "staff_members"), where("status", "==", "Present")), (snapshot) => {
+      setStats(prev => ({ ...prev, staff: snapshot.size }));
+    });
+
+    return () => { salesUnsub(); purUnsub(); staffUnsub(); };
   }, []);
 
-  const reportCards = [
-    { label: 'Daily Sale', value: `Rs. ${stats.dailySale}`, color: '#10b981' },
-    { label: 'Daily Profit', value: `Rs. ${stats.dailyProfit}`, color: '#f59e0b' },
-    { label: 'Active Staff', value: stats.activeStaff, color: '#3b82f6' },
-    { label: 'Total Purchase', value: `Rs. ${stats.dailyPurchase}`, color: '#ef4444' }
-  ];
-
   return (
-    <div className="dashboard-wrapper" style={{ padding: '15px' }}>
-      <header style={headerStyle}>
+    <div className="dashboard-wrapper">
+      {/* Header Section */}
+      <header style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 5px' }}>
         <div>
-          <p style={{ color: '#888', fontSize: '12px', margin: 0 }}>HITL-FLOWTRACK</p>
-          <h2 style={{ fontSize: '18px', margin: 0, color: '#fff' }}>
-            {auth.currentUser?.email.split('@')[0].toUpperCase()}
-          </h2>
+          <p className="welcome-text">Assalam-o-Alaikum,</p>
+          <h2 style={{ fontSize: '20px', margin: 0 }}>{auth.currentUser?.email.split('@')[0].toUpperCase()}</h2>
         </div>
-        <div style={roleBadgeStyle}>{userData?.role || 'USER'}</div>
+        <div style={{ background: '#f59e0b', color: '#000', padding: '5px 12px', borderRadius: '50px', fontWeight: 'bold', fontSize: '10px', height: 'fit-content' }}>
+          {userData?.role?.toUpperCase()}
+        </div>
       </header>
 
-      {/* Real-time Cards */}
-      <div style={gridStyle}>
-        {reportCards.map((card, i) => (
-          <div key={i} style={cardStyle}>
-            <span style={{ fontSize: '10px', color: '#666' }}>{card.label}</span>
-            <h3 style={{ margin: '5px 0 0', fontSize: '16px', color: card.color }}>{card.value}</h3>
-          </div>
-        ))}
+      {/* Condition 3: Dashboard Reports */}
+      <div className="stats-grid" style={{ marginTop: '20px' }}>
+        <div className="stat-card">
+          <span>Daily Sale</span>
+          <h3 style={{ color: '#10b981' }}>Rs. {stats.sale.toLocaleString()}</h3>
+        </div>
+        <div className="stat-card">
+          <span>Daily Profit</span>
+          <h3 style={{ color: '#f59e0b' }}>Rs. {stats.profit.toLocaleString()}</h3>
+        </div>
+        <div className="stat-card">
+          <span>Purchases</span>
+          <h3 style={{ color: '#ef4444' }}>Rs. {stats.purchase.toLocaleString()}</h3>
+        </div>
+        <div className="stat-card">
+          <span>Present Staff</span>
+          <h3 style={{ color: '#3b82f6' }}>{stats.staff}</h3>
+        </div>
       </div>
 
-      <h4 style={sectionTitleStyle}>OPERATIONS CONTROL</h4>
+      <h4 style={{ fontSize: '12px', margin: '20px 0 10px 5px', opacity: 0.6 }}>MAIN OPERATIONS</h4>
 
+      {/* Module Links */}
       <div className="module-list">
-        <div onClick={() => setActiveTab('sales')} style={itemStyle}>
-          <div style={iconBox}>🛒</div>
-          <div style={{ flex: 1 }}>
-            <strong style={{ fontSize: '14px' }}>Sales Terminal</strong>
-            <p style={{ fontSize: '10px', color: '#666', margin: 0 }}>Create orders & invoices</p>
+        <div className="module-item" onClick={() => setActiveTab('sales')}>
+          <div className="icon-box">🛒</div>
+          <div className="module-info">
+            <strong>Sales Terminal</strong>
+            <p>Direct billing & invoice generation</p>
           </div>
-          <span>→</span>
         </div>
 
-        <div onClick={() => setActiveTab('inventory')} style={itemStyle}>
-          <div style={iconBox}>📦</div>
-          <div style={{ flex: 1 }}>
-            <strong style={{ fontSize: '14px' }}>Inventory Hub</strong>
-            <p style={{ fontSize: '10px', color: '#666', margin: 0 }}>Stock levels & pricing</p>
+        <div className="module-item" onClick={() => setActiveTab('purchase')}>
+          <div className="icon-box">🚚</div>
+          <div className="module-info">
+            <strong>Purchase / Inward</strong>
+            <p>Add new stock & record buying price</p>
           </div>
-          <span>→</span>
         </div>
 
-        <div onClick={() => setActiveTab('staff')} style={itemStyle}>
-          <div style={iconBox}>👥</div>
-          <div style={{ flex: 1 }}>
-            <strong style={{ fontSize: '14px' }}>Staff & Attendance</strong>
-            <p style={{ fontSize: '10px', color: '#666', margin: 0 }}>Track duty & shifts</p>
+        <div className="module-item" onClick={() => setActiveTab('inventory')}>
+          <div className="icon-box">📦</div>
+          <div className="module-info">
+            <strong>Inventory Hub</strong>
+            <p>Check stock levels & distribution</p>
           </div>
-          <span>→</span>
         </div>
       </div>
 
-      <button onClick={onLogout} style={logoutButtonStyle}>SECURE LOGOUT</button>
+      <button onClick={onLogout} style={{ width: '100%', padding: '15px', background: 'transparent', color: '#ef4444', border: '1px solid #222', borderRadius: '15px', marginTop: '30px', fontSize: '12px' }}>
+        LOGOUT SYSTEM
+      </button>
     </div>
   );
 };
-
-// --- Styles ---
-const headerStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' };
-const roleBadgeStyle = { background: '#f59e0b', color: '#000', padding: '4px 12px', borderRadius: '50px', fontSize: '10px', fontWeight: 'bold' };
-const gridStyle = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '25px' };
-const cardStyle = { background: '#111', padding: '15px', borderRadius: '18px', border: '1px solid #222' };
-const sectionTitleStyle = { fontSize: '11px', color: '#f59e0b', marginBottom: '15px', letterSpacing: '1px' };
-const itemStyle = { background: '#111', display: 'flex', alignItems: 'center', padding: '15px', borderRadius: '18px', marginBottom: '12px', border: '1px solid #222', cursor: 'pointer' };
-const iconBox = { width: '40px', height: '40px', background: '#1a1a1a', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', marginRight: '15px' };
-const logoutButtonStyle = { width: '100%', marginTop: '20px', padding: '15px', background: 'transparent', border: '1px solid #333', borderRadius: '12px', color: '#ef4444', fontSize: '12px' };
 
 export default Dashboard;

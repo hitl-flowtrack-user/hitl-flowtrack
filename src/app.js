@@ -1,6 +1,23 @@
 import React, { useState } from 'react';
 import './app.css';
 
+// app.js mein ye logic add karen
+import Login from './components/login';
+
+function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  if (!isLoggedIn) {
+    return <Login onLoginSuccess={() => setIsLoggedIn(true)} />;
+  }
+
+  // Baqi sara dashboard aur modules is ke niche ayenge
+  return (
+    <div className="app-container">
+      {/* Your Dashboard Logic */}
+    </div>
+  );
+}
 // Tamam imports ab lowercase hain jaisa aapne GitHub par kiya
 import dashboard from './components/dashboard';
 import additem from './components/additem';

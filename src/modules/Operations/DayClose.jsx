@@ -1,168 +1,196 @@
-import React, { useState, useEffect } from 'react';
-import { db, logActivity } from '../../firebase';
-import { collection, addDoc, getDocs, query, where, serverTimestamp, doc, setDoc } from 'firebase/firestore';
-import { Lock, Unlock, TrendingUp, ShoppingBag, Users, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { db } from "../../firebase";
+import { collection, getDocs, query, where, Timestamp, addDoc, serverTimestamp } from "firebase/firestore";
+import { useAuth } from "../../context/useAuth";
+import { 
+  Lock, Unlock, DollarSign, ShoppingCart, 
+  Users, Calendar, Loader2, FileText, CheckCircle2 
+} from "lucide-react";
 
-const DayClose = ({ currentUser }) => {
-  const [stats, setStats] = useState({ totalSales: 0, totalOrders: 0, attendanceCount: 0 });
-  const [isLocked, setIsLocked] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  const todayDate = new Date().toISOString().split('T')[0]; // Aaj ki date (YYYY-MM-DD)
-
-  // 1. Aaj ka Data aur Lock Status Check Karna
-  const fetchDailyStats = async () => {
-    setLoading(true);
-    try {
-      // Sales Check
-      const salesQuery = query(
-        collection(db, "orders"),
-        where("companyId", "==", currentUser.companyId),
-        where("timestamp", ">=", new Date(todayDate))
-      );
-      const salesSnap = await getDocs(salesQuery);
-      let total = 0;
-      salesSnap.forEach(doc => total += doc.data().total);
-
-      // Attendance Check
-      const attendQuery = query(
-        collection(db, "attendance"),
-        where("companyId", "==", currentUser.companyId),
-        where("timestamp", ">=", new Date(todayDate))
-      );
-      const attendSnap = await getDocs(attendQuery);
-
-      // Lock Status Check (Hum "locks" collection mein check karenge)
-      const lockSnap = await getDocs(query(
-        collection(db, "day_locks"),
-        where("companyId", "==", currentUser.companyId),
-        where("date", "==", todayDate)
-      ));
-
-      setStats({
-        totalSales: total,
-        totalOrders: salesSnap.size,
-        attendanceCount: attendSnap.size
-      });
-      setIsLocked(!lockSnap.empty);
-
-    } catch (e) {
-      console.error("Stats error: ", e);
-    }
-    setLoading(false);
-  };
+export default function DayClose() {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [isClosing, setIsClosing] = useState(false);
+  const [reportData, setReportData] = useState({
+    totalSales: 0,
+    orderCount: 0,
+    presentStaff: 0,
+    orders: []
+  });
 
   useEffect(() => {
-    if (currentUser?.companyId) fetchDailyStats();
-  }, [currentUser]);
-
-  // 2. Day Close (Lock) Activate Karna
-  const handleDayClose = async () => {
-    if (window.confirm("Kya aap waqai Day Close karna chahte hain? Iske baad aaj ka data edit nahi ho sakega.")) {
+    const fetchDailyStats = async () => {
+      if (!user?.companyId) return;
       try {
-        await addDoc(collection(db, "day_locks"), {
-          companyId: currentUser.companyId,
-          date: todayDate,
-          closedBy: currentUser.uid,
-          closedAt: serverTimestamp(),
-          finalSales: stats.totalSales
+        setLoading(true);
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const startTimestamp = Timestamp.fromDate(today);
+        
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const endTimestamp = Timestamp.fromDate(tomorrow);
+
+        const qOrders = query(
+          collection(db, "orders"),
+          where("companyId", "==", user.companyId),
+          where("createdAt", ">=", startTimestamp),
+          where("createdAt", "<", endTimestamp)
+        );
+        const orderSnap = await getDocs(qOrders);
+        const ordersList = orderSnap.docs.map(doc => doc.data());
+        const salesSum = ordersList.reduce((sum, ord) => sum + (ord.total || 0), 0);
+
+        const qAttendance = query(
+          collection(db, "attendance"),
+          where("companyId", "==", user.companyId),
+          where("date", "==", today.toISOString().split('T')[0])
+        );
+        const attSnap = await getDocs(qAttendance);
+
+        setReportData({
+          totalSales: salesSum,
+          orderCount: ordersList.length,
+          presentStaff: attSnap.size,
+          orders: ordersList
         });
 
-        await logActivity(
-          currentUser.uid, 
-          currentUser.companyId, 
-          "DAY_CLOSED", 
-          "Operations", 
-          `Day closed for ${todayDate}. Total Sales: ${stats.totalSales}`
-        );
+      } catch (err) {
+        console.error("Error fetching day stats:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-        setIsLocked(true);
-        alert("System Locked! Din ka ikhtitam ho gaya.");
-      } catch (e) {
-        alert("Lock lagane mein masla: " + e.message);
+    fetchDailyStats();
+  }, [user]);
+
+  const handleDayClose = async () => {
+    if (window.confirm("Are you sure you want to close the day? This will save the final report.")) {
+      setIsClosing(true);
+      try {
+        await addDoc(collection(db, "day_summaries"), {
+          companyId: user.companyId,
+          date: new Date().toISOString().split('T')[0],
+          totalRevenue: reportData.totalSales,
+          totalOrders: reportData.orderCount,
+          staffPresent: reportData.presentStaff,
+          closedBy: user.email,
+          closedAt: serverTimestamp()
+        });
+        alert("Day closed successfully!");
+      } catch (err) {
+        // Line 86 fix: Logging the error so 'err' is used
+        console.error("Day Close Error:", err);
+        alert("Error closing day! Check console for details.");
+      } finally {
+        setIsClosing(false);
       }
     }
   };
 
+  if (loading) return <div className="p-20 text-center"><Loader2 className="animate-spin text-amber-500 mx-auto" size={40} /></div>;
+
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="flex items-center gap-2 mb-8">
-        <Lock className="text-red-600" size={32} />
-        <h1 className="text-2xl font-bold text-gray-800">Day Close & Daily Analytics</h1>
+    <div className="p-4 md:p-8 min-h-screen bg-slate-950 text-white font-sans">
+      {/* HEADER */}
+      <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-3xl font-black italic uppercase flex items-center gap-3">
+            <Lock className="text-amber-500" size={32} /> Day Close Report
+          </h2>
+          <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em]">Review and finalize today's operations</p>
+        </div>
+        <div className="bg-white/5 border border-white/10 px-6 py-3 rounded-2xl flex items-center gap-3">
+          <Calendar size={18} className="text-amber-500" />
+          <span className="font-black text-sm uppercase tracking-tighter">{new Date().toDateString()}</span>
+        </div>
       </div>
 
-      {/* Analytics Cards */}
+      {/* STATS GRID */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border-b-4 border-green-500">
-          <div className="flex justify-between items-center mb-4">
-            <TrendingUp className="text-green-500" />
-            <span className="text-xs font-bold text-gray-400">TOTAL SALES</span>
+        <div className="bg-white/5 border border-white/10 p-8 rounded-[2.5rem] relative overflow-hidden group">
+          <div className="absolute -right-4 -bottom-4 text-white/5 group-hover:text-amber-500/10 transition-colors">
+            <DollarSign size={120} />
           </div>
-          <h2 className="text-3xl font-black">Rs. {stats.totalSales}</h2>
-          <p className="text-sm text-gray-500 mt-1">Aaj ki kul farokht</p>
+          <p className="text-[10px] font-black text-zinc-500 uppercase mb-2">Total Sales Revenue</p>
+          <h3 className="text-4xl font-black text-white italic">Rs.{reportData.totalSales}</h3>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border-b-4 border-blue-500">
-          <div className="flex justify-between items-center mb-4">
-            <ShoppingBag className="text-blue-500" />
-            <span className="text-xs font-bold text-gray-400">TOTAL ORDERS</span>
+        <div className="bg-white/5 border border-white/10 p-8 rounded-[2.5rem] relative overflow-hidden group">
+          <div className="absolute -right-4 -bottom-4 text-white/5 group-hover:text-amber-500/10 transition-colors">
+            <ShoppingCart size={120} />
           </div>
-          <h2 className="text-3xl font-black">{stats.totalOrders}</h2>
-          <p className="text-sm text-gray-500 mt-1">Book kiye gaye orders</p>
+          <p className="text-[10px] font-black text-zinc-500 uppercase mb-2">Orders Completed</p>
+          <h3 className="text-4xl font-black text-white italic">{reportData.orderCount}</h3>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border-b-4 border-orange-500">
-          <div className="flex justify-between items-center mb-4">
-            <Users className="text-orange-500" />
-            <span className="text-xs font-bold text-gray-400">ATTENDANCE</span>
+        <div className="bg-white/5 border border-white/10 p-8 rounded-[2.5rem] relative overflow-hidden group">
+          <div className="absolute -right-4 -bottom-4 text-white/5 group-hover:text-amber-500/10 transition-colors">
+            <Users size={120} />
           </div>
-          <h2 className="text-3xl font-black">{stats.attendanceCount}</h2>
-          <p className="text-sm text-gray-500 mt-1">Staff jo hazir hai</p>
+          <p className="text-[10px] font-black text-zinc-500 uppercase mb-2">Staff Attendance</p>
+          <h3 className="text-4xl font-black text-white italic">{reportData.presentStaff} Present</h3>
         </div>
       </div>
 
-      {/* Lock Action Area */}
-      <div className="bg-white p-8 rounded-3xl shadow-lg text-center border-2 border-dashed border-gray-200">
-        {isLocked ? (
-          <div className="space-y-4">
-            <div className="bg-red-100 text-red-700 w-20 h-20 rounded-full flex items-center justify-center mx-auto">
-              <Lock size={40} />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800">Aaj ka Din Lock Hai</h2>
-            <p className="text-gray-500 max-w-sm mx-auto">
-              Security ki wajah se aaj ki tarikh mein mazeed koi tabdeeli nahi ki ja sakti. 
-              Naye orders kal ki tarikh mein book honge.
-            </p>
-            <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2 rounded-full text-sm font-bold">
-              <CheckCircle size={16} /> Closed by Admin
-            </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 bg-white/5 border border-white/10 rounded-[2.5rem] p-6 overflow-hidden">
+          <h4 className="text-sm font-black uppercase mb-6 flex items-center gap-2">
+            <FileText size={16} className="text-amber-500" /> Today's Transaction Log
+          </h4>
+          <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+            {reportData.orders.length === 0 && <p className="text-zinc-600 italic text-center py-10 text-xs uppercase font-black">No transactions recorded today.</p>}
+            {reportData.orders.map((order, i) => (
+              <div key={i} className="flex justify-between items-center p-4 bg-black/20 rounded-2xl border border-white/5 hover:border-amber-500/20 transition-all">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-500 font-black text-xs italic">TRX</div>
+                  <div>
+                    <p className="text-xs font-black uppercase text-white">{order.bookedBy?.split('@')[0] || "Cashier"}</p>
+                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">{order.items?.length || 0} Items</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-black text-white italic">Rs.{order.total}</p>
+                  <p className="text-[9px] text-emerald-500 font-black uppercase tracking-tighter">Paid</p>
+                </div>
+              </div>
+            ))}
           </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="bg-blue-100 text-blue-700 w-20 h-20 rounded-full flex items-center justify-center mx-auto">
-              <Unlock size={40} />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800">Day Close System Active</h2>
-            <p className="text-gray-500 max-w-sm mx-auto">
-              Chutti karne se pehle "Day Close" ka button dabayen taake sara data mahfooz (Lock) ho jaye.
-            </p>
-            <button 
-              onClick={handleDayClose}
-              disabled={loading}
-              className="bg-red-600 text-white px-10 py-4 rounded-xl font-bold hover:bg-red-700 transition-all shadow-xl shadow-red-200"
-            >
-              {loading ? "Locking..." : "Close Day Now"}
-            </button>
-          </div>
-        )}
-      </div>
+        </div>
 
-      {/* DocVault Note */}
-      <p className="text-center mt-8 text-gray-400 text-sm">
-        Generated reports will be saved in <b>DocVault</b> automatically after Day Close.
-      </p>
+        <div className="bg-slate-900 border border-white/10 rounded-[2.5rem] p-8 h-fit shadow-2xl relative overflow-hidden">
+          <div className="text-center mb-8 relative z-10">
+            <div className="w-20 h-20 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-amber-500/20">
+              <Lock className="text-amber-500" size={32} />
+            </div>
+            <h3 className="text-xl font-black italic uppercase">Finalize Operations</h3>
+            <p className="text-[10px] text-zinc-500 font-bold uppercase mt-2">Lock today's accounts</p>
+          </div>
+
+          <ul className="space-y-4 mb-8 relative z-10">
+            <li className="flex items-center gap-3 text-[10px] font-black uppercase text-zinc-400">
+              <CheckCircle2 size={16} className="text-emerald-500" /> Sales Verified
+            </li>
+            <li className="flex items-center gap-3 text-[10px] font-black uppercase text-zinc-400">
+              <CheckCircle2 size={16} className="text-emerald-500" /> Attendance Sync Complete
+            </li>
+            <li className="flex items-center gap-3 text-[10px] font-black uppercase text-zinc-400">
+              <CheckCircle2 size={16} className="text-emerald-500" /> Inventory Adjusted
+            </li>
+          </ul>
+
+          <button 
+            onClick={handleDayClose}
+            disabled={isClosing}
+            className="w-full bg-amber-500 hover:bg-amber-400 text-black py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-amber-500/20 active:scale-95 flex items-center justify-center gap-2 relative z-10"
+          >
+            {isClosing ? <Loader2 className="animate-spin" size={20} /> : <Unlock size={20} />}
+            {isClosing ? "Closing..." : "Close Day Now"}
+          </button>
+        </div>
+      </div>
     </div>
   );
-};
-
-export default DayClose;
+}

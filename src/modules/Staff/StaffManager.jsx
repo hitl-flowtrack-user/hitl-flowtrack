@@ -1,156 +1,132 @@
-import React, { useState, useEffect } from 'react';
-import { db, auth, logActivity } from '../../firebase'; // Humari purani file se connection
-import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
-import { Users, UserPlus, ShieldCheck, MapPin } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { db } from "../../firebase";
+import { collection, onSnapshot, query, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
+import { Users, UserPlus, Pencil, Trash2, ShieldCheck, DollarSign, Target } from "lucide-react";
+import { useAuth } from "../../context/useAuth";
 
-const StaffManager = ({ currentUser }) => {
-  const [staffList, setStaffList] = useState([]);
-  const [loading, setLoading] = useState(false);
+export default function StaffManager() {
+  const { user } = useAuth();
+  const [staff, setStaff] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    role: 'Salesman',
-    salary: '',
-    target: '',
-    baseLocation: '' // Geo-fencing ke liye
+    name: "", email: "", role: "User", phone: "",
+    baseSalary: "", incentiveRate: "", monthlyTarget: "",
+    designation: "", companyId: user?.companyId || ""
   });
 
-  // 1. Staff ki List Load Karna (Sirf apni Company ka data)
-  const fetchStaff = async () => {
-    setLoading(true);
-    try {
-      const q = query(
-        collection(db, "users"), 
-        where("companyId", "==", currentUser.companyId)
-      );
-      const querySnapshot = await getDocs(q);
-      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setStaffList(data);
-    } catch (error) {
-      alert("Data load karne mein masla hua: " + error.message);
-    }
-    setLoading(false);
-  };
-
   useEffect(() => {
-    if (currentUser?.companyId) fetchStaff();
-  }, [currentUser]);
+    if (!user?.companyId) return;
+    const q = query(collection(db, "staff"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setStaff(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, [user?.companyId]);
 
-  // 2. Naya Staff Add Karna
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const newStaff = {
-        ...formData,
-        companyId: currentUser.companyId,
-        createdAt: new Date().toISOString(),
-        status: 'active'
-      };
-
-      await addDoc(collection(db, "users"), newStaff);
-      
-      // Activity Log: Record rakhna ke kis ne add kiya
-      await logActivity(
-        currentUser.uid, 
-        currentUser.companyId, 
-        "STAFF_ADDED", 
-        "Staff Management", 
-        `Added new staff: ${formData.name}`
-      );
-
-      alert("Staff kamyabi se add ho gaya!");
-      setFormData({ name: '', phone: '', role: 'Salesman', salary: '', target: '', baseLocation: '' });
-      fetchStaff(); // List refresh karna
-    } catch (error) {
-      alert("Add karne mein ghalti: " + error.message);
-    }
+      if (editMode) {
+        await updateDoc(doc(db, "staff", formData.id), { ...formData, updatedAt: serverTimestamp() });
+      } else {
+        await addDoc(collection(db, "staff"), { ...formData, createdAt: serverTimestamp() });
+      }
+      setShowModal(false);
+      setEditMode(false);
+      resetForm();
+    } catch (err) { alert("Action Failed!"); }
   };
 
+  const resetForm = () => setFormData({ name: "", email: "", role: "User", phone: "", baseSalary: "", incentiveRate: "", monthlyTarget: "", designation: "", companyId: user?.companyId });
+
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="flex items-center gap-2 mb-6">
-        <Users className="text-blue-600" size={32} />
-        <h1 className="text-2xl font-bold text-gray-800">HITL-FlowTrack Staff Management</h1>
+    <div className="p-4 md:p-8 bg-slate-950 min-h-screen text-white">
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h2 className="text-3xl font-black italic uppercase flex items-center gap-3 tracking-tighter">
+            <Users className="text-amber-500" size={32} /> Staff Vault
+          </h2>
+          <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Manage Roles & Payroll</p>
+        </div>
+        <button onClick={() => { resetForm(); setShowModal(true); }} className="bg-amber-500 text-black px-6 py-3 rounded-xl font-black uppercase text-[10px] flex items-center gap-2 hover:bg-amber-400">
+          <UserPlus size={16} /> Add Staff Member
+        </button>
       </div>
 
-      {/* Form: Naya Staff Add Karne ke liye */}
-      <div className="bg-white p-6 rounded-xl shadow-md mb-8">
-        <h2 className="flex items-center gap-2 text-lg font-semibold mb-4">
-          <UserPlus size={20} /> Naya Staff Shamil Karen
-        </h2>
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <input 
-            className="border p-2 rounded" 
-            placeholder="Pura Naam" 
-            value={formData.name}
-            onChange={(e) => setFormData({...formData, name: e.target.value})}
-            required 
-          />
-          <input 
-            className="border p-2 rounded" 
-            placeholder="Phone Number" 
-            value={formData.phone}
-            onChange={(e) => setFormData({...formData, phone: e.target.value})}
-            required 
-          />
-          <select 
-            className="border p-2 rounded"
-            value={formData.role}
-            onChange={(e) => setFormData({...formData, role: e.target.value})}
-          >
-            <option value="Salesman">Salesman</option>
-            <option value="Accountant">Accountant</option>
-            <option value="Manager">Manager</option>
-          </select>
-          <input 
-            className="border p-2 rounded" 
-            placeholder="Mahana Salary" 
-            type="number"
-            value={formData.salary}
-            onChange={(e) => setFormData({...formData, salary: e.target.value})}
-          />
-          <input 
-            className="border p-2 rounded" 
-            placeholder="Sales Target" 
-            type="number"
-            value={formData.target}
-            onChange={(e) => setFormData({...formData, target: e.target.value})}
-          />
-          <button type="submit" className="bg-blue-600 text-white p-2 rounded hover:bg-blue-700 transition">
-            Staff Save Karen
-          </button>
-        </form>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {staff.map((member) => (
+          <div key={member.id} className="bg-white/5 border border-white/10 rounded-[2rem] p-6 hover:border-amber-500/30 transition-all relative group">
+            <div className="absolute top-6 right-6 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+              <button onClick={() => { setFormData(member); setEditMode(true); setShowModal(true); }} className="p-2 bg-white/10 rounded-lg hover:text-amber-500"><Pencil size={14} /></button>
+              <button onClick={async () => window.confirm("Delete member?") && await deleteDoc(doc(db, "staff", member.id))} className="p-2 bg-white/10 rounded-lg hover:text-red-500"><Trash2 size={14} /></button>
+            </div>
+            
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center text-black font-black italic">{member.name[0]}</div>
+              <div>
+                <h3 className="font-black uppercase italic text-lg leading-tight">{member.name}</h3>
+                <span className="text-[10px] bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded font-bold uppercase">{member.role}</span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex justify-between text-[11px] border-b border-white/5 pb-2">
+                <span className="text-zinc-500 uppercase font-bold flex items-center gap-1"><DollarSign size={12}/> Base Salary</span>
+                <span className="font-black">Rs. {member.baseSalary}</span>
+              </div>
+              <div className="flex justify-between text-[11px] border-b border-white/5 pb-2">
+                <span className="text-zinc-500 uppercase font-bold flex items-center gap-1"><Target size={12}/> Monthly Target</span>
+                <span className="font-black">Rs. {member.monthlyTarget}</span>
+              </div>
+              <div className="flex justify-between text-[11px]">
+                <span className="text-zinc-500 uppercase font-bold">Incentive Rate</span>
+                <span className="text-emerald-500 font-black">{member.incentiveRate}%</span>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {/* Table: Staff ki List */}
-      <div className="bg-white rounded-xl shadow-md overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="p-4">Naam</th>
-              <th className="p-4">Role</th>
-              <th className="p-4">Salary</th>
-              <th className="p-4">Target</th>
-              <th className="p-4">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {staffList.map((staff) => (
-              <tr key={staff.id} className="border-t hover:bg-gray-50">
-                <td className="p-4 font-medium">{staff.name}</td>
-                <td className="p-4 text-blue-600">{staff.role}</td>
-                <td className="p-4">Rs. {staff.salary}</td>
-                <td className="p-4">Rs. {staff.target}</td>
-                <td className="p-4">
-                  <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-sm">Active</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* MODAL */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleSubmit} className="bg-[#121212] w-full max-w-xl rounded-[2.5rem] p-8 border border-white/10">
+            <h3 className="text-2xl font-black italic uppercase mb-6">{editMode ? "Update Details" : "New Staff Registration"}</h3>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="col-span-2">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase ml-2">Full Name</label>
+                <input required className="w-full bg-white/5 border border-white/10 p-3 rounded-xl outline-none focus:border-amber-500 uppercase text-xs" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase ml-2">Role</label>
+                <select className="w-full bg-white/5 border border-white/10 p-3 rounded-xl outline-none text-xs" value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}>
+                  <option value="Admin">Admin</option>
+                  <option value="User">User / Booker</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase ml-2">Base Salary</label>
+                <input type="number" className="w-full bg-white/5 border border-white/10 p-3 rounded-xl outline-none text-xs" value={formData.baseSalary} onChange={e => setFormData({...formData, baseSalary: e.target.value})} />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase ml-2">Monthly Target</label>
+                <input type="number" className="w-full bg-white/5 border border-white/10 p-3 rounded-xl outline-none text-xs" value={formData.monthlyTarget} onChange={e => setFormData({...formData, monthlyTarget: e.target.value})} />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase ml-2">Incentive (%)</label>
+                <input type="number" className="w-full bg-white/5 border border-white/10 p-3 rounded-xl outline-none text-xs" value={formData.incentiveRate} onChange={e => setFormData({...formData, incentiveRate: e.target.value})} />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button type="submit" className="flex-1 bg-amber-500 text-black py-4 rounded-2xl font-black uppercase text-xs italic tracking-widest">{editMode ? "Update" : "Confirm Staff"}</button>
+              <button type="button" onClick={() => setShowModal(false)} className="px-6 text-zinc-500 font-bold uppercase text-[10px]">Cancel</button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
-};
-
-export default StaffManager;
+}

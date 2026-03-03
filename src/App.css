@@ -40,3 +40,14 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Global Text Fix */
+input, textarea, select {
+  color: black !important;
+  background-color: white !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af !important;
+}

@@ -1,183 +1,105 @@
-import React, { useState, useEffect } from 'react';
-import { db, logActivity } from '../../firebase';
-import { collection, addDoc, getDocs, query, where, updateDoc, doc } from 'firebase/firestore';
-import { Box, Package, AlertTriangle, Warehouse, FileText } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { db } from "../../firebase";
+import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from "firebase/firestore";
+import { Box, Pencil, Trash2, Plus, Search, Loader2 } from "lucide-react";
+import { useAuth } from "../../context/useAuth";
+import AddItem from './AddItem';
 
-const ProductManager = ({ currentUser }) => {
+export default function ProductManager() {
+  const { user } = useAuth();
   const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    sku: '',
-    name: '',
-    category: 'StoneCraft', // Restricted word changed
-    warehouse: 'Main Warehouse',
-    stockLevel: '',
-    minLevel: '10', // Is se kam stock par alert aayega
-    price: ''
-  });
-
-  // 1. Stock Load Karna
-  const fetchInventory = async () => {
-    setLoading(true);
-    try {
-      const q = query(
-        collection(db, "products"),
-        where("companyId", "==", currentUser.companyId)
-      );
-      const querySnapshot = await getDocs(q);
-      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setProducts(data);
-    } catch (error) {
-      alert("Inventory load nahi ho saki: " + error.message);
-    }
-    setLoading(false);
-  };
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [view, setView] = useState('list');
+  const [editData, setEditData] = useState(null);
 
   useEffect(() => {
-    if (currentUser?.companyId) fetchInventory();
-  }, [currentUser]);
+    if (!user?.companyId) {
+      setLoading(false);
+      return;
+    }
 
-  // 2. Naya Product ya Stock Entry
-  const handleAddProduct = async (e) => {
-    e.preventDefault();
-    try {
-      const productData = {
-        ...formData,
-        companyId: currentUser.companyId,
-        stockLevel: Number(formData.stockLevel),
-        minLevel: Number(formData.minLevel),
-        price: Number(formData.price),
-        lastUpdated: new Date().toISOString()
-      };
+    const q = query(collection(db, "elite_inventory"), orderBy("createdAt", "desc"));
+    
+    // onSnapshot automatically updates the list when data changes
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setProducts(items);
+      setLoading(false);
+    }, (err) => {
+      console.error(err);
+      setLoading(false);
+    });
 
-      await addDoc(collection(db, "products"), productData);
+    return () => unsubscribe();
+  }, [user?.companyId]);
 
-      // Activity Log: Kis ne stock add kiya
-      await logActivity(
-        currentUser.uid,
-        currentUser.companyId,
-        "PRODUCT_ADDED",
-        "Inventory",
-        `Added item: ${formData.name} in ${formData.warehouse}`
-      );
-
-      alert("Item kamyabi se shamil ho gaya!");
-      setFormData({ sku: '', name: '', category: 'StoneCraft', warehouse: 'Main Warehouse', stockLevel: '', minLevel: '10', price: '' });
-      fetchInventory();
-    } catch (error) {
-      alert("Error: " + error.message);
+  const handleDelete = async (id, name) => {
+    if (window.confirm(`Delete "${name}"?`)) {
+      try {
+        await deleteDoc(doc(db, "elite_inventory", id));
+      } catch (err) { alert("Delete Failed!"); }
     }
   };
 
+  const filtered = products.filter(p => 
+    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (view === 'add') {
+    return <AddItem editData={editData} onComplete={() => { setView('list'); setEditData(null); }} />;
+  }
+
+  if (loading) return (
+    <div className="min-h-screen bg-black flex flex-col items-center justify-center text-amber-500">
+      <Loader2 className="animate-spin mb-4" size={40} />
+      <span className="text-[10px] font-black uppercase tracking-widest">Loading Vault...</span>
+    </div>
+  );
+
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-2">
-          <Box className="text-orange-600" size={32} />
-          <h1 className="text-2xl font-bold text-gray-800">HITL-FlowTrack Inventory</h1>
+    <div className="p-6 bg-black min-h-screen text-white font-sans">
+      <div className="flex justify-between items-center mb-8">
+        <div>
+            <h2 className="text-3xl font-black italic uppercase flex items-center gap-3 tracking-tighter">
+                <Box className="text-amber-500" /> Inventory
+            </h2>
+            <p className="text-zinc-600 text-[10px] font-bold uppercase tracking-widest">{products.length} Products Registered</p>
         </div>
-        <button className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2 rounded-lg">
-          <FileText size={18} /> DocVault Reports
+        <button onClick={() => setView('add')} className="bg-amber-500 text-black px-6 py-3 rounded-xl font-black uppercase text-[10px] flex items-center gap-2 hover:bg-amber-400">
+          <Plus size={16} /> Add Product
         </button>
       </div>
 
-      {/* Form: Stock Entry */}
-      <div className="bg-white p-6 rounded-xl shadow-sm mb-8 border border-gray-200">
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Package size={20} className="text-blue-500" /> New Stock Entry
-        </h2>
-        <form onSubmit={handleAddProduct} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <input 
-            className="border p-2 rounded" 
-            placeholder="SKU Number (e.g. SC-001)" 
-            value={formData.sku}
-            onChange={(e) => setFormData({...formData, sku: e.target.value})}
-            required 
-          />
-          <input 
-            className="border p-2 rounded" 
-            placeholder="Item Name" 
-            value={formData.name}
-            onChange={(e) => setFormData({...formData, name: e.target.value})}
-            required 
-          />
-          <select 
-            className="border p-2 rounded"
-            value={formData.category}
-            onChange={(e) => setFormData({...formData, category: e.target.value})}
-          >
-            <option value="StoneCraft">StoneCraft</option>
-            <option value="Fixtures">Fixtures</option>
-            <option value="Adhesives">Adhesives</option>
-          </select>
-          <select 
-            className="border p-2 rounded"
-            value={formData.warehouse}
-            onChange={(e) => setFormData({...formData, warehouse: e.target.value})}
-          >
-            <option value="Main Warehouse">Main Warehouse</option>
-            <option value="Sub-Store A">Sub-Store A</option>
-            <option value="Transit">In Transit</option>
-          </select>
-          <input 
-            className="border p-2 rounded" 
-            placeholder="Quantity" 
-            type="number"
-            value={formData.stockLevel}
-            onChange={(e) => setFormData({...formData, stockLevel: e.target.value})}
-            required
-          />
-          <input 
-            className="border p-2 rounded" 
-            placeholder="Min Alert Level" 
-            type="number"
-            value={formData.minLevel}
-            onChange={(e) => setFormData({...formData, minLevel: e.target.value})}
-          />
-          <input 
-            className="border p-2 rounded" 
-            placeholder="Unit Price" 
-            type="number"
-            value={formData.price}
-            onChange={(e) => setFormData({...formData, price: e.target.value})}
-            required
-          />
-          <button type="submit" className="bg-orange-600 text-white p-2 rounded font-bold hover:bg-orange-700">
-            Add to Stock
-          </button>
-        </form>
+      <div className="relative mb-6">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600" size={16} />
+        <input 
+          type="text" placeholder="Search by name or SKU..."
+          className="w-full bg-[#121212] border border-white/5 rounded-xl py-4 pl-12 pr-4 text-xs font-bold uppercase focus:border-amber-500/50 outline-none"
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
-      {/* Inventory List & Alerts */}
-      <div className="grid grid-cols-1 gap-4">
-        {products.map((item) => (
-          <div key={item.id} className="bg-white p-4 rounded-lg shadow-sm border-l-4 flex justify-between items-center" 
-               style={{ borderLeftColor: item.stockLevel <= item.minLevel ? '#ef4444' : '#10b981' }}>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold bg-gray-100 px-2 py-1 rounded text-gray-600">{item.sku}</span>
-                <h3 className="font-bold text-gray-800">{item.name}</h3>
-                {item.stockLevel <= item.minLevel && (
-                  <span className="text-red-500 flex items-center gap-1 text-xs font-bold animate-pulse">
-                    <AlertTriangle size={14} /> LOW STOCK
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                <Warehouse size={14} /> {item.warehouse} | Category: {item.category}
-              </p>
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        {filtered.map((p) => (
+          <div key={p.id} className="bg-[#121212] border border-white/5 rounded-[2rem] p-4 group hover:border-amber-500/30 transition-all">
+            <div className="h-28 bg-black rounded-2xl mb-3 overflow-hidden border border-white/5 flex items-center justify-center">
+                {p.imageUrl ? <img src={p.imageUrl} className="w-full h-full object-cover" alt="" /> : <span className="text-zinc-800 font-black italic text-xs">NO IMG</span>}
             </div>
-            
-            <div className="text-right">
-              <div className="text-2xl font-black text-gray-800">{item.stockLevel}</div>
-              <div className="text-xs text-gray-400 font-bold uppercase">Units Left</div>
-              <div className="text-sm font-semibold text-green-600">Rs. {item.price}</div>
+            <h3 className="text-[10px] font-black uppercase italic truncate mb-1">{p.name}</h3>
+            <p className="text-amber-500 font-bold text-[8px] tracking-widest uppercase mb-3">{p.sku}</p>
+            <div className="flex gap-2">
+                <button onClick={() => { setEditData(p); setView('add'); }} className="flex-1 bg-white/5 p-2 rounded-lg hover:bg-amber-500 hover:text-black transition-all">
+                    <Pencil size={12} className="mx-auto" />
+                </button>
+                <button onClick={() => handleDelete(p.id, p.name)} className="flex-1 bg-white/5 p-2 rounded-lg hover:bg-red-500 text-red-500 hover:text-white transition-all">
+                    <Trash2 size={12} className="mx-auto" />
+                </button>
             </div>
           </div>
         ))}
       </div>
     </div>
   );
-};
-
-export default ProductManager;
+}

@@ -1,152 +1,180 @@
-import React, { useState, useEffect } from 'react';
-import { db, logActivity } from '../../firebase';
-import { collection, addDoc, getDocs, query, where, doc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
-import { ShoppingCart, User, MapPin, CheckCircle, Trash2, FileText } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { db } from "../../firebase";
+import { collection, getDocs, query, where, addDoc, serverTimestamp } from "firebase/firestore";
+import { useAuth } from "../../context/useAuth";
+import { ShoppingCart, Plus, Minus, Trash2, CheckCircle, Loader2 } from "lucide-react";
 
-const OrderBooking = ({ currentUser }) => {
+export default function OrderBooking() {
+  const { user } = useAuth();
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
-  const [customerName, setCustomerName] = useState('');
-  const [isLocationVerified, setIsLocationVerified] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isPlacing, setIsPlacing] = useState(false);
 
-  // Sample Customer Location (Real app mein ye customer ke database se aayega)
-  const CUSTOMER_SHOP_LOCATION = { lat: 31.3454, lng: 73.5123 }; 
-
-  // 1. Location Check Karna (Geo-Restriction)
+  // Fetch Products
   useEffect(() => {
-    navigator.geolocation.getCurrentPosition((pos) => {
-      const dist = calculateDistance(pos.coords.latitude, pos.coords.longitude, CUSTOMER_SHOP_LOCATION.lat, CUSTOMER_SHOP_LOCATION.lng);
-      if (dist <= 200) setIsLocationVerified(true);
-    });
-    fetchProducts();
-  }, []);
-
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371e3;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-  };
-
-  // 2. Stock Load Karna (StoneCraft items)
-  const fetchProducts = async () => {
-    const q = query(collection(db, "products"), where("companyId", "==", currentUser.companyId));
-    const snap = await getDocs(q);
-    setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-  };
-
-  // 3. Cart mein item dalna
-  const addToCart = (product) => {
-    if (product.stockLevel <= 0) return alert("Stock khatam hai!");
-    const existing = cart.find(item => item.id === product.id);
-    if (existing) {
-      setCart(cart.map(item => item.id === product.id ? { ...item, qty: item.qty + 1 } : item));
-    } else {
-      setCart([...cart, { ...product, qty: 1 }]);
-    }
-  };
-
-  // 4. Order Finalize Karna
-  const placeOrder = async () => {
-    if (!isLocationVerified) return alert("Order Cancelled: Aap customer ki shop par maujood nahi hain!");
-    if (!customerName || cart.length === 0) return alert("Customer name aur items zaroori hain!");
-
-    setLoading(true);
-    try {
-      // Order save karna
-      const orderRef = await addDoc(collection(db, "orders"), {
-        customerName,
-        items: cart,
-        total: cart.reduce((sum, i) => sum + (i.price * i.qty), 0),
-        bookedBy: currentUser.uid,
-        companyId: currentUser.companyId,
-        timestamp: serverTimestamp(),
-        status: "Pending Dispatch"
-      });
-
-      // Stock update karna (Inventory se minus karna)
-      for (const item of cart) {
-        const productRef = doc(db, "products", item.id);
-        await updateDoc(productRef, {
-          stockLevel: increment(-item.qty)
-        });
+    const fetchProducts = async () => {
+      if (!user?.companyId) return;
+      try {
+        const q = query(
+          collection(db, "products"),
+          where("companyId", "==", user.companyId)
+        );
+        const querySnapshot = await getDocs(q);
+        const productsData = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setProducts(productsData);
+      } catch (error) {
+        console.error("Error fetching products:", error);
+      } finally {
+        setLoading(false);
       }
+    };
+    fetchProducts();
+  }, [user]);
 
-      await logActivity(currentUser.uid, currentUser.companyId, "ORDER_PLACED", "Sales", `Order #${orderRef.id} for ${customerName}`);
-      
-      alert("Order Book ho gaya! DocVault mein invoice check karen.");
-      setCart([]);
-      setCustomerName('');
-      fetchProducts();
-    } catch (e) {
-      alert("Order failed: " + e.message);
+  const addToCart = (product) => {
+    const existingItem = cart.find(item => item.id === product.id);
+    if (existingItem) {
+      setCart(cart.map(item =>
+        item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+      ));
+    } else {
+      setCart([...cart, { ...product, quantity: 1 }]);
     }
-    setLoading(false);
   };
+
+  const updateQuantity = (id, change) => {
+    setCart(cart.map(item => {
+      if (item.id === id) {
+        const newQty = item.quantity + change;
+        return newQty > 0 ? { ...item, quantity: newQty } : item;
+      }
+      return item;
+    }));
+  };
+
+  const removeFromCart = (id) => {
+    setCart(cart.filter(item => item.id !== id));
+  };
+
+  const totalAmount = cart.reduce((sum, item) => sum + (Number(item.price || 0) * item.quantity), 0);
+
+  const handlePlaceOrder = async () => {
+    if (cart.length === 0) return alert("Cart is empty!");
+    
+    if (!user?.companyId || !user?.email) {
+      return alert("User session not found. Please log in again.");
+    }
+
+    setIsPlacing(true);
+    try {
+      const orderData = {
+        companyId: user.companyId,
+        bookedBy: user.email,
+        items: cart.map(item => ({
+          id: item.id,
+          name: item.name || "Unknown Item",
+          price: Number(item.price) || 0,
+          quantity: item.quantity
+        })),
+        total: totalAmount,
+        status: "completed",
+        createdAt: serverTimestamp()
+      };
+
+      await addDoc(collection(db, "orders"), orderData);
+      
+      alert("Order Placed Successfully!");
+      setCart([]);
+    } catch (error) {
+      console.error("Order Error:", error);
+      alert("Error placing order: " + error.message);
+    } finally {
+      setIsPlacing(false);
+    }
+  };
+
+  if (loading) return <div className="p-20 text-center"><Loader2 className="animate-spin mx-auto text-amber-500" size={40} /></div>;
 
   return (
-    <div className="p-4 md:p-8 bg-gray-50 min-h-screen grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Left side: Product List */}
-      <div className="lg:col-span-2">
-        <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><ShoppingCart /> StoneCraft Items</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {products.map(p => (
-            <div key={p.id} className="bg-white p-4 rounded-xl shadow-sm border hover:border-blue-500 cursor-pointer" onClick={() => addToCart(p)}>
-              <div className="flex justify-between">
-                <span className="font-bold">{p.name}</span>
-                <span className="text-green-600 font-bold">Rs.{p.price}</span>
-              </div>
-              <p className="text-xs text-gray-500 mt-1">Stock Available: {p.stockLevel}</p>
-            </div>
-          ))}
-        </div>
+    <div className="p-4 md:p-8 min-h-screen bg-slate-950 text-white font-sans">
+      <div className="mb-8">
+        <h2 className="text-3xl font-black italic uppercase flex items-center gap-3">
+          <ShoppingCart className="text-amber-500" size={32} /> POS Terminal
+        </h2>
+        <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em]">Live Order Management</p>
       </div>
 
-      {/* Right side: Cart & Checkout */}
-      <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-blue-600 h-fit sticky top-6">
-        <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-blue-600"><FileText /> Order Summary</h2>
-        
-        <div className="mb-4">
-          <label className="text-xs font-bold text-gray-400 uppercase">Customer Name</label>
-          <div className="flex items-center gap-2 border-b-2 py-2">
-            <User size={18} className="text-gray-400" />
-            <input className="w-full outline-none" placeholder="Enter Customer Name" value={customerName} onChange={e => setCustomerName(e.target.value)} />
-          </div>
-        </div>
-
-        <div className="space-y-3 mb-6">
-          {cart.map(item => (
-            <div key={item.id} className="flex justify-between text-sm">
-              <span>{item.name} x {item.qty}</span>
-              <span className="font-bold">Rs.{item.price * item.qty}</span>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Product Grid */}
+        <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-4">
+          {products.length === 0 && <p className="text-zinc-500 italic p-10 col-span-full text-center">No products found. Please add products first.</p>}
+          {products.map((product) => (
+            <div 
+              key={product.id}
+              onClick={() => addToCart(product)}
+              className="bg-white/5 border border-white/10 p-4 rounded-3xl hover:border-amber-500/50 transition-all cursor-pointer group relative overflow-hidden"
+            >
+              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Plus size={20} className="text-amber-500" />
+              </div>
+              <h4 className="font-black uppercase text-sm mb-1">{product.name}</h4>
+              <p className="text-amber-500 font-black italic text-lg">Rs.{product.price}</p>
+              <p className="text-[9px] text-zinc-500 uppercase font-bold mt-2">Stock: {product.stock || 0}</p>
             </div>
           ))}
         </div>
 
-        <div className="border-t pt-4 mb-6">
-          <div className="flex justify-between text-xl font-black">
-            <span>Total:</span>
-            <span>Rs.{cart.reduce((sum, i) => sum + (i.price * i.qty), 0)}</span>
+        {/* Cart Sidebar */}
+        <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-6 h-fit sticky top-8">
+          <h3 className="text-lg font-black uppercase mb-6 flex items-center gap-2 italic">
+            Current Order <span className="text-xs bg-amber-500 text-black px-2 py-0.5 rounded-full not-italic">{cart.length}</span>
+          </h3>
+
+          <div className="space-y-4 mb-8 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+            {cart.length === 0 && (
+              <p className="text-zinc-600 italic text-center py-10 text-xs font-black uppercase">Your cart is empty</p>
+            )}
+            {cart.map((item) => (
+              <div key={item.id} className="flex justify-between items-center bg-black/40 p-3 rounded-2xl border border-white/5">
+                <div>
+                  <p className="text-[11px] font-black uppercase">{item.name}</p>
+                  <p className="text-[10px] text-amber-500 font-black">Rs.{item.price}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center bg-white/5 rounded-lg border border-white/10">
+                    <button onClick={() => updateQuantity(item.id, -1)} className="p-1 hover:text-amber-500"><Minus size={14} /></button>
+                    <span className="text-xs font-black px-2">{item.quantity}</span>
+                    <button onClick={() => updateQuantity(item.id, 1)} className="p-1 hover:text-amber-500"><Plus size={14} /></button>
+                  </div>
+                  <button onClick={() => removeFromCart(item.id)} className="text-zinc-500 hover:text-red-500 transition-colors">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="border-t border-white/10 pt-6">
+            <div className="flex justify-between items-end mb-6">
+              <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Total Payable</span>
+              <span className="text-3xl font-black italic text-white">Rs.{totalAmount}</span>
+            </div>
+
+            <button
+              onClick={handlePlaceOrder}
+              disabled={isPlacing || cart.length === 0}
+              className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-500 text-black font-black uppercase py-4 rounded-2xl tracking-widest transition-all flex items-center justify-center gap-2"
+            >
+              {isPlacing ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle size={20} />}
+              {isPlacing ? "Processing..." : "Place Order"}
+            </button>
           </div>
         </div>
-
-        {/* Location Verification Tag */}
-        <div className={`p-3 rounded-lg mb-4 text-xs font-bold flex items-center gap-2 ${isLocationVerified ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-          <MapPin size={14} /> {isLocationVerified ? "Shop Location Verified" : "Verification Failed: Not at Shop"}
-        </div>
-
-        <button 
-          onClick={placeOrder}
-          disabled={loading || !isLocationVerified}
-          className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-blue-700 disabled:bg-gray-300 transition-all"
-        >
-          {loading ? "Processing..." : "Confirm & Book Order"}
-        </button>
       </div>
     </div>
   );
-};
-
-export default OrderBooking;
+}

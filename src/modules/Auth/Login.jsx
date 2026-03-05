@@ -31,7 +31,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-[#0f172a]">
       <form
         onSubmit={handleSubmit}
-        className="bg-[#00ff87] p-8 rounded-xl w-96 shadow-2xl"
+        className="bg-white p-8 rounded-xl w-96 shadow-2xl"
       >
         <h2 className="text-2xl font-bold mb-6 text-center">
           Login to FlowTrack
